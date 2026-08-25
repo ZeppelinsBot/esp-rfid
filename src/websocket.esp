@@ -10,10 +10,21 @@ struct WsMessage
 };
 
 WsMessage *wsMessageQueue = NULL;
+int wsQueueLength = 0;
+#define MAX_WS_QUEUE 20
 
 // messageSize needs to be one char bigger than the string to contain the string terminator
 void addWsMessageToQueue(AsyncWebSocketClient *client, int messageSize)
 {
+	if (wsQueueLength >= MAX_WS_QUEUE)
+	{
+#ifdef DEBUG
+		Serial.println(F("[ WARN ] WebSocket queue full, dropping message"));
+#endif
+		free(client->_tempObject);
+		client->_tempObject = NULL;
+		return;
+	}
 	WsMessage *incomingMessage = new WsMessage;
 	incomingMessage->serializedMessage = (char *)malloc(messageSize);
 	strlcpy(incomingMessage->serializedMessage, (const char *)client->_tempObject, messageSize);
@@ -21,6 +32,7 @@ void addWsMessageToQueue(AsyncWebSocketClient *client, int messageSize)
 	client->_tempObject = NULL;
 
 	incomingMessage->client = client;
+	wsQueueLength++;
 
 	WsMessage *lastMessage = wsMessageQueue;
 	// process only one message at the time
@@ -41,7 +53,7 @@ void addWsMessageToQueue(AsyncWebSocketClient *client, int messageSize)
 void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 {
 	// We should always get a JSON object (stringfied) from browser, so parse it
-	DynamicJsonDocument root(2448);
+	JsonDocument root;
 	AsyncWebSocketClient *client = incomingMessage->client;
 	// cast to const char * to avoid in-place editing of serializedMessage
 	auto error = deserializeJson(root, (const char *)incomingMessage->serializedMessage);
@@ -52,7 +64,7 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 		Serial.println(F("[ WARN ] Couldn't parse WebSocket message"));
 #endif
 		free(incomingMessage->serializedMessage);
-		free(incomingMessage);
+		delete incomingMessage;
 		return;
 	}
 	// Web Browser sends some commands, check which command is given
@@ -206,7 +218,7 @@ void ICACHE_FLASH_ATTR processWsMessage(WsMessage *incomingMessage)
 		}
 	}
 	free(incomingMessage->serializedMessage);
-	free(incomingMessage);
+	delete incomingMessage;
 	yield();
 }
 
@@ -260,6 +272,7 @@ void processWsQueue()
 	{
 		WsMessage *messageToProcess = wsMessageQueue;
 		wsMessageQueue = messageToProcess->nextMessage;
+		wsQueueLength--;
 		processWsMessage(messageToProcess);
 	}
 }

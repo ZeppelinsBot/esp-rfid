@@ -200,7 +200,7 @@ void ICACHE_RAM_ATTR loop()
 	doorStatus();
 	doorbellStatus();
 
-	if (currentMillis >= cooldown)
+	if ((long)(currentMillis - cooldown) >= 0)
 	{
 		rfidLoop();
 	}

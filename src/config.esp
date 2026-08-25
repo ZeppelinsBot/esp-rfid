@@ -11,7 +11,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 	size_t size = configFile.size();
 	std::unique_ptr<char[]> buf(new char[size]);
 	configFile.readBytes(buf.get(), size);
-	DynamicJsonDocument json(2048);
+	JsonDocument json;
 	auto error = deserializeJson(json, buf.get(), size);
 	if (error)
 	{
@@ -31,7 +31,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 #ifdef DEBUG
 	Serial.println(F("[ INFO ] Trying to setup RFID Hardware"));
 #endif
-	if (hardware.containsKey("wifipin"))
+	if (!hardware["wifipin"].isNull())
 	{
 		config.wifipin = hardware["wifipin"];
 		if (config.wifipin != 255)
@@ -41,7 +41,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("doorstatpin"))
+	if (!hardware["doorstatpin"].isNull())
 	{
 		config.doorstatpin = hardware["doorstatpin"];
 		if (config.doorstatpin != 255)
@@ -50,12 +50,12 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("maxOpenDoorTime"))
+	if (!hardware["maxOpenDoorTime"].isNull())
 	{
 		config.maxOpenDoorTime = hardware["maxOpenDoorTime"];
 	}
 
-	if (hardware.containsKey("doorbellpin"))
+	if (!hardware["doorbellpin"].isNull())
 	{
 		config.doorbellpin = hardware["doorbellpin"];
 		if (config.doorbellpin != 255)
@@ -64,7 +64,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("accessdeniedpin"))
+	if (!hardware["accessdeniedpin"].isNull())
 	{
 		config.accessdeniedpin = hardware["accessdeniedpin"];
 		if (config.accessdeniedpin != 255)
@@ -74,7 +74,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("beeperpin"))
+	if (!hardware["beeperpin"].isNull())
 	{
 		config.beeperpin = hardware["beeperpin"];
 		if (config.beeperpin != 255)
@@ -84,7 +84,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("ledwaitingpin"))
+	if (!hardware["ledwaitingpin"].isNull())
 	{
 		config.ledwaitingpin = hardware["ledwaitingpin"];
 		if (config.ledwaitingpin != 255)
@@ -94,7 +94,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("openlockpin"))
+	if (!hardware["openlockpin"].isNull())
 	{
 		config.openlockpin = hardware["openlockpin"];
 		if (config.openlockpin != 255)
@@ -105,7 +105,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		}
 	}
 
-	if (hardware.containsKey("numrelays"))
+	if (!hardware["numrelays"].isNull())
 	{
 		config.numRelays = hardware["numrelays"];
 	}
@@ -120,19 +120,19 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 	{
 		int wgd0pin = hardware["wgd0pin"];
 		int wgd1pin = hardware["wgd1pin"];
-		if (hardware.containsKey("requirepincodeafterrfid"))
+		if (!hardware["requirepincodeafterrfid"].isNull())
 		{
 			config.pinCodeRequested = hardware["requirepincodeafterrfid"];
 		}
-		if (hardware.containsKey("allowpincodeonly"))
+		if (!hardware["allowpincodeonly"].isNull())
 		{
 			config.pinCodeOnly = hardware["allowpincodeonly"];
 		}
-		if (hardware.containsKey("removeparitybits"))
+		if (!hardware["removeparitybits"].isNull())
 		{
 			config.removeParityBits = hardware["removeparitybits"];
 		}
-		if (hardware.containsKey("useridstoragemode"))
+		if (!hardware["useridstoragemode"].isNull())
 		{
 			config.wiegandReadHex = hardware["useridstoragemode"] == "hexadecimal";
 		}
@@ -141,7 +141,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 	else if (config.readertype == READER_MFRC522 || config.readertype == READER_MFRC522_RDM6300)
 	{
 		rfidss = 15;
-		if (hardware.containsKey("sspin"))
+		if (!hardware["sspin"].isNull())
 		{
 			rfidss = hardware["sspin"];
 		}
@@ -160,7 +160,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		setupRDM6300Reader(rmd6300TxPin);
 	}
 
-	if (network.containsKey("fallbackmode"))
+	if (!network["fallbackmode"].isNull())
 	{
 		config.fallbackMode = network["fallbackmode"] == 1;
 	}
@@ -169,18 +169,18 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 	const char *bssidmac = network["bssid"];
 	if (strlen(bssidmac) > 0)
 		parseBytes(bssidmac, ':', config.bssid, 6, 16);
-	if (general.containsKey("hostnm"))
+	if (!general["hostnm"].isNull())
 	{
 		config.deviceHostname = strdup(general["hostnm"]);
 	}
-	if (ntp.containsKey("server"))
+	if (!ntp["server"].isNull())
 	{
 		config.ntpServer = strdup(ntp["server"]);
 	}
 	config.ntpInterval = ntp["interval"];
 	
 	// support for old config
-	if (ntp.containsKey("timezone"))
+	if (!ntp["timezone"].isNull())
 	{
 		config.tzInfo = (char *) malloc(10 * sizeof(char));
 		float tz = ntp["timezone"];
@@ -197,7 +197,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 			snprintf(config.tzInfo, 10, "UTC");
 		}
 	}
-	if (ntp.containsKey("tzinfo"))
+	if (!ntp["tzinfo"].isNull())
 	{
 		config.tzInfo = (char *) malloc(strlen(ntp["tzinfo"]) * sizeof(char));
 		config.tzInfo = strdup(ntp["tzinfo"]);
@@ -209,7 +209,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 	config.activateTime[0] = hardware["rtime"];
 	config.lockType[0] = hardware["ltype"];
 	config.relayType[0] = hardware["rtype"];
-	if (hardware.containsKey("doorname"))
+	if (!hardware["doorname"].isNull())
 	{
 		config.doorName[0] = strdup(hardware["doorname"]);
 	}
@@ -225,7 +225,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		config.lockType[i] = relay["ltype"];
 		config.relayType[i] = relay["rtype"];
 		config.relayPin[i] = relay["rpin"];
-		if (relay.containsKey("doorname"))
+		if (!relay["doorname"].isNull())
 		{
 			config.doorName[i]= strdup(relay["doorname"]);
 		}
@@ -233,42 +233,42 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		digitalWrite(config.relayPin[i], !config.relayType[i]);
 	}
 
-	if (network.containsKey("ssid"))
+	if (!network["ssid"].isNull())
 	{
 		config.ssid = strdup(network["ssid"]);
 	}
-	if (network.containsKey("pswd"))
+	if (!network["pswd"].isNull())
 	{
 		config.wifiPassword = strdup(network["pswd"]);
 	}
 	config.accessPointMode = network["wmode"] == 1;
-	if (network.containsKey("apip"))
+	if (!network["apip"].isNull())
 	{
 		config.wifiApIp = strdup(network["apip"]);
 	}
-	if (network.containsKey("apsubnet"))
+	if (!network["apsubnet"].isNull())
 	{
 		config.wifiApSubnet = strdup(network["apsubnet"]);
 	}
 	config.networkHidden = network["hide"] == 1;
-	if (general.containsKey("pswd"))
+	if (!general["pswd"].isNull())
 	{
 		config.httpPass = strdup(general["pswd"]);
 	}
 	config.dhcpEnabled = network["dhcp"] == 1;
-	if (network.containsKey("ip"))
+	if (!network["ip"].isNull())
 	{
 		config.ipAddress.fromString(network["ip"].as<const char*>());
 	}
-	if (network.containsKey("subnet"))
+	if (!network["subnet"].isNull())
 	{
 		config.subnetIp.fromString(network["subnet"].as<const char*>());
 	}
-	if (network.containsKey("gateway"))
+	if (!network["gateway"].isNull())
 	{
 		config.gatewayIp.fromString(network["gateway"].as<const char*>());
 	}
-	if (network.containsKey("dns"))
+	if (!network["dns"].isNull())
 	{
 		config.dnsIp.fromString(network["dns"].as<const char*>());
 	}
@@ -298,7 +298,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 
 	for (int d = 0; d < 7; d++)
 	{
-		if (general.containsKey("openinghours"))
+		if (!general["openinghours"].isNull())
 		{
 			config.openingHours[d] = strdup(general["openinghours"][d].as<const char *>());
 		}
@@ -321,7 +321,7 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 		config.mqttPass = strdup(mpasString.c_str());
 		String mqttTopicString = mqtt["topic"];
 		config.mqttTopic = strdup(mqttTopicString.c_str());
-		if (mqtt.containsKey("autotopic"))
+		if (!mqtt["autotopic"].isNull())
 		{
 			config.mqttAutoTopic = mqtt["autotopic"];
 		}
@@ -336,15 +336,15 @@ bool ICACHE_FLASH_ATTR loadConfiguration(Config &config)
 			strcat(newTopic, topicSuffix);
 			config.mqttTopic = newTopic;
 		}
-		if (mqtt.containsKey("syncrate"))
+		if (!mqtt["syncrate"].isNull())
 		{
 			config.mqttInterval = mqtt["syncrate"];
 		}
-		if (mqtt.containsKey("mqttlog"))
+		if (!mqtt["mqttlog"].isNull())
 		{
 			config.mqttEvents = mqtt["mqttlog"] == 1;
 		}
-		if (mqtt.containsKey("mqttha"))
+		if (!mqtt["mqttha"].isNull())
 		{
 			config.mqttHA = mqtt["mqttha"] == 1;
 		}

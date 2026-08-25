@@ -2,7 +2,7 @@ void extern mqttPublishEvent(JsonDocument *root);
 
 void ICACHE_FLASH_ATTR writeEvent(String type, String src, String desc, String data)
 {
-	DynamicJsonDocument root(512);
+	JsonDocument root;
 	root["type"] = type;
 	root["src"] = src;
 	root["desc"] = desc;
@@ -28,7 +28,7 @@ void ICACHE_FLASH_ATTR writeEvent(String type, String src, String desc, String d
 
 void ICACHE_FLASH_ATTR writeLatest(String uid, String username, int acctype, int access = ACCESS_GRANTED)
 {
-	DynamicJsonDocument root(512);
+	JsonDocument root;
 	root["uid"] = uid;
 	root["username"] = username;
 	root["acctype"] = acctype;
@@ -56,13 +56,13 @@ void ICACHE_FLASH_ATTR sendLogFile(int page, String fileName, int logFileType, A
 	if (page == 1)
 		lastPos = 0;
 	float pages;
-	DynamicJsonDocument root(2048);
+	JsonDocument root;
 	if (logFileType == LOGTYPE_EVENTLOG)
 		root["command"] = "eventlist";
 	if (logFileType == LOGTYPE_LATESTLOG)
 		root["command"] = "latestlist";
 	root["page"] = page;
-	JsonArray items = root.createNestedArray("list");
+	JsonArray items = root["list"].to<JsonArray>();
 
 	File logFile;
 
@@ -220,10 +220,10 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
 {
 
-	DynamicJsonDocument root(512);
+	JsonDocument root;
 	root["command"] = "listfiles";
 	root["page"] = page;
-	JsonArray items = root.createNestedArray("list");
+	JsonArray items = root["list"].to<JsonArray>();
 
 	size_t first = (page - 1) * FILES_PER_PAGE;
 	size_t last = page * FILES_PER_PAGE;
@@ -240,7 +240,7 @@ void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
 		{
 			if (numFiles >= first && numFiles < last)
 			{
-				JsonObject item = items.createNestedObject();
+				JsonObject item = items.add<JsonObject>();
 				item["filename"] = dir.fileName();
 				item["filesize"] = dir.fileSize();
 			} // first, last

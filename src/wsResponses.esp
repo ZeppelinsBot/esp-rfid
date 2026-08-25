@@ -1,9 +1,9 @@
 void ICACHE_FLASH_ATTR sendUserList(int page, AsyncWebSocketClient *client)
 {
-	DynamicJsonDocument root(2048);
+	JsonDocument root;
 	root["command"] = "userlist";
 	root["page"] = page;
-	JsonArray users = root.createNestedArray("list");
+	JsonArray users = root["list"].to<JsonArray>();
 	Dir dir = SPIFFS.openDir("/P/");
 	int first = (page - 1) * 10;
 	int last = page * 10;
@@ -12,7 +12,7 @@ void ICACHE_FLASH_ATTR sendUserList(int page, AsyncWebSocketClient *client)
 	{
 		if (i >= first && i < last)
 		{
-			JsonObject item = users.createNestedObject();
+			JsonObject item = users.add<JsonObject>();
 			String uid = dir.fileName();
 			uid.remove(0, 3);
 			item["uid"] = uid;
@@ -20,13 +20,13 @@ void ICACHE_FLASH_ATTR sendUserList(int page, AsyncWebSocketClient *client)
 			size_t size = f.size();
 			std::unique_ptr<char[]> buf(new char[size]);
 			f.readBytes(buf.get(), size);
-			DynamicJsonDocument json(512);
+			JsonDocument json;
 			auto error = deserializeJson(json, buf.get(), size);
 			if (!error)
 			{
 				String username = json["user"];
 				String pincode = "";
-				if(json.containsKey("pincode"))
+				if(!json["pincode"].isNull())
 				{
 					pincode = String((const char *)json["pincode"]);
 				}
@@ -40,7 +40,7 @@ void ICACHE_FLASH_ATTR sendUserList(int page, AsyncWebSocketClient *client)
 					int AccType = json[theKey];
 					item[theKey] = AccType;
 				}
-				unsigned long validsince = json.containsKey("validsince") ? json["validsince"] : 0;
+				unsigned long validsince = !json["validsince"].isNull() ? json["validsince"] : 0;
 				unsigned long validuntil = json["validuntil"];
 				item["username"] = username;
 				item["validsince"] = validsince;
@@ -82,7 +82,7 @@ void ICACHE_FLASH_ATTR sendStatus(AsyncWebSocketClient *client)
 		Serial.print(F("[ WARN ] Error getting info on SPIFFS"));
 #endif
 	}
-	DynamicJsonDocument root(512);
+	JsonDocument root;
 	root["command"] = "status";
 	root["heap"] = ESP.getFreeHeap();
 	root["chipid"] = String(ESP.getChipId(), HEX);
@@ -166,12 +166,12 @@ void ICACHE_FLASH_ATTR printScanResult(int networksFound)
 			}
 		}
 	}
-	DynamicJsonDocument root(512);
+	JsonDocument root;
 	root["command"] = "ssidlist";
-	JsonArray scan = root.createNestedArray("list");
+	JsonArray scan = root["list"].to<JsonArray>();
 	for (int i = 0; i < 5 && i < networksFound; ++i)
 	{
-		JsonObject item = scan.createNestedObject();
+		JsonObject item = scan.add<JsonObject>();
 		item["ssid"] = WiFi.SSID(indices[i]);
 		item["bssid"] = WiFi.BSSIDstr(indices[i]);
 		item["rssi"] = WiFi.RSSI(indices[i]);
@@ -191,7 +191,7 @@ void ICACHE_FLASH_ATTR printScanResult(int networksFound)
 
 void ICACHE_FLASH_ATTR sendTime(AsyncWebSocketClient *client)
 {
-	DynamicJsonDocument root(512);
+	JsonDocument root;
 	root["command"] = "gettime";
 	root["epoch"] = epoch;
 	size_t len = measureJson(root);
