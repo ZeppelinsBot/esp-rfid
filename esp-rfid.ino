@@ -58,15 +58,7 @@ HardwareSerial *rdm6300HwSerial = NULL;
 bool activateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
 bool deactivateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
 
-// these are from vendors
-#include "src/webh/glyphicons-halflings-regular.woff.gz.h"
-#include "src/webh/required.css.gz.h"
-#include "src/webh/required.js.gz.h"
-
-// these are from us which can be updated and changed
-#include "src/webh/esprfid.js.gz.h"
-#include "src/webh/esprfid.htm.gz.h"
-#include "src/webh/index.html.gz.h"
+// Web assets served from SPIFFS (uploaded separately via ESP32 Sketch Data Upload)
 
 WiFiClient mqttNet;
 MQTTClient mqttClient(2048);

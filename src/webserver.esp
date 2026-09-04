@@ -50,34 +50,32 @@ void setupWebServer() {
 		}
 	});
 	server.on("/fonts/glyphicons-halflings-regular.woff", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "font/woff", glyphicons_halflings_regular_woff_gz, glyphicons_halflings_regular_woff_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/glyphicons-halflings-regular.woff", "font/woff");
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	});
 	server.on("/css/required.css", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/css", required_css_gz, required_css_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/required.css", "text/css");
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	});
 	server.on("/js/required.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", required_js_gz, required_js_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/required.js", "text/javascript");
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	});
 	server.on("/js/esprfid.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/javascript", esprfid_js_gz, esprfid_js_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/esprfid.js", "text/javascript");
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	});
-
 	server.on("/index.html", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, index_html_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/index.html", "text/html");
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	});
-
 	server.on("/esprfid.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
-		AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", esprfid_htm_gz, esprfid_htm_gz_len);
+		AsyncWebServerResponse *response = request->beginResponse(SPIFFS, "/esprfid.htm", "text/html");
 		response->addHeader("Content-Encoding", "gzip");
 		request->send(response);
 	});
