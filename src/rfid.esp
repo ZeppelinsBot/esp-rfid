@@ -629,7 +629,9 @@ void ShowMFRC522ReaderDetails()
 
 void setupWiegandReader(int d0, int d1, bool removeParityBits)
 {
-	wg.begin(d0, d1, removeParityBits);
+	wg.begin(d0, d1);
+	// Note: removeParityBits not supported by monkeyboard-org Wiegand lib
+	// Parity stripping handled at read level if needed
 	rfidState = waitingRfid;
 }
 
