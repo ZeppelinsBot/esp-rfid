@@ -35,7 +35,7 @@ SOFTWARE.
 #include <ESPAsyncWebServer.h>
 #include <TimeLib.h>
 #include <time.h>
-#include <AsyncMqttClient.h>
+#include <MQTTClient.h>
 #include <Bounce2.h>
 #include "magicnumbers.h"
 #include "config.h"
@@ -68,7 +68,8 @@ bool deactivateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
 #include "webh/esprfid.htm.gz.h"
 #include "webh/index.html.gz.h"
 
-AsyncMqttClient mqttClient;
+WiFiClient mqttNet;
+MQTTClient mqttClient(2048);
 
 // millis-based timers replacing Ticker
 unsigned long mqttReconnectTimerStart = 0;
@@ -333,18 +334,22 @@ void loop()
 		}
 	}
 
-	if (config.mqttEnabled && mqttClient.connected())
+	if (config.mqttEnabled)
 	{
-		if ((unsigned)epoch > nextbeat)
+		mqttClient.loop();
+		if (mqttClient.connected())
 		{
-			mqttPublishHeartbeat(epoch, uptimeSeconds);
-			nextbeat = (unsigned)epoch + config.mqttInterval;
+			if ((unsigned)epoch > nextbeat)
+			{
+				mqttPublishHeartbeat(epoch, uptimeSeconds);
+				nextbeat = (unsigned)epoch + config.mqttInterval;
 #ifdef DEBUG
-			Serial.print("[ INFO ] Nextbeat=");
-			Serial.println(nextbeat);
+				Serial.print("[ INFO ] Nextbeat=");
+				Serial.println(nextbeat);
 #endif
+			}
+			processMqttQueue();
 		}
-		processMqttQueue();
 	}
 
 	processWsQueue();

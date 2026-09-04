@@ -22,7 +22,44 @@ void connectToMqtt()
 #ifdef DEBUG
 	Serial.println("[ INFO ] Connecting MQTT");
 #endif
-	mqttClient.connect();
+	String clientId = String(config.deviceHostname) + "-" + String(random(0xffff), HEX);
+	bool connected = mqttClient.connect(clientId.c_str(), config.mqttUser, config.mqttPass);
+	if (connected) {
+		writeEvent("INFO", "mqtt", "Connected to MQTT Server", "");
+		// Publish boot message
+		mqttPublishBoot(epoch);
+
+		// Subscribe to command topic
+		String stopic(config.mqttTopic);
+		stopic = stopic + "/cmd";
+		mqttClient.subscribe(stopic.c_str());
+
+		if (config.mqttHA)
+		{
+			mqttPublishDiscovery();
+			mqttPublishAvty();
+			if (config.doorstatpin != 255)
+			{
+				mqttPublishIo("door", digitalRead(config.doorstatpin) == HIGH ? "OFF" : "ON");
+			}
+			if (config.doorbellpin != 255)
+			{
+				mqttPublishIo("doorbell", digitalRead(config.doorbellpin) == HIGH ? "ON" : "OFF");
+			}
+			for (int i = 0; i < config.numRelays; i++)
+			{
+				mqttPublishIo("lock" + String(i), digitalRead(config.relayPin[i]) == config.relayType[i] ? "UNLOCKED" : "LOCKED");
+			}
+			mqttPublishIo("tamper", "OFF");
+		}
+	} else {
+		writeEvent("WARN", "mqtt", "MQTT connection failed", "");
+		if (WiFi.isConnected())
+		{
+			mqttReconnectTimerStart = millis();
+			mqttReconnectTimerActive = true;
+		}
+	}
 }
 
 void disconnectMqtt()
@@ -33,43 +70,7 @@ void disconnectMqtt()
 #ifdef DEBUG
 	Serial.println("[ INFO ] Disconnecting MQTT");
 #endif
-	mqttClient.disconnect(true);
-}
-
-void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
-{
-	String reasonstr = "";
-	switch (reason)
-	{
-	case (AsyncMqttClientDisconnectReason::TCP_DISCONNECTED):
-		reasonstr = "TCP_DISCONNECTED";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_UNACCEPTABLE_PROTOCOL_VERSION):
-		reasonstr = "MQTT_UNACCEPTABLE_PROTOCOL_VERSION";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_IDENTIFIER_REJECTED):
-		reasonstr = "MQTT_IDENTIFIER_REJECTED";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_SERVER_UNAVAILABLE):
-		reasonstr = "MQTT_SERVER_UNAVAILABLE";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_MALFORMED_CREDENTIALS):
-		reasonstr = "MQTT_MALFORMED_CREDENTIALS";
-		break;
-	case (AsyncMqttClientDisconnectReason::MQTT_NOT_AUTHORIZED):
-		reasonstr = "MQTT_NOT_AUTHORIZED";
-		break;
-	default:
-		reasonstr = "Unknown";
-		break;
-	}
-	writeEvent("WARN", "mqtt", "Disconnected from MQTT server", reasonstr);
-
-	if (WiFi.isConnected())
-	{
-		mqttReconnectTimerStart = millis();
-		mqttReconnectTimerActive = true;
-	}
+	mqttClient.disconnect();
 }
 
 void mqttPublishEvent(JsonDocument *root, String topic)
@@ -78,12 +79,12 @@ void mqttPublishEvent(JsonDocument *root, String topic)
 	{
 		String stopic(config.mqttTopic);
 		stopic = stopic + "/" + topic;
-		String mqttBuffer;
-		serializeJson(*root, mqttBuffer);
-		mqttClient.publish(stopic.c_str(), 0, false, mqttBuffer.c_str());
+		String mqttMsg;
+		serializeJson(*root, mqttMsg);
+		mqttClient.publish(stopic.c_str(), mqttMsg.c_str());
 #ifdef DEBUG
 		Serial.print("[ INFO ] Mqtt Publish:");
-		Serial.println(mqttBuffer);
+		Serial.println(mqttMsg);
 #endif
 	}
 }
@@ -94,12 +95,12 @@ void mqttPublishEventHA(JsonDocument *root, String topic)
 	{
 		String stopic = "homeassistant/";
 		stopic = stopic + topic;
-		String mqttBuffer;
-		serializeJson(*root, mqttBuffer);
-		mqttClient.publish(stopic.c_str(), 0, true, mqttBuffer.c_str());
+		String mqttMsg;
+		serializeJson(*root, mqttMsg);
+		mqttClient.publish(stopic.c_str(), mqttMsg.c_str());
 #ifdef DEBUG
 		Serial.print("[ INFO ] Mqtt Publish:");
-		Serial.println(mqttBuffer);
+		Serial.println(mqttMsg);
 #endif
 	}
 }
@@ -292,7 +293,7 @@ void mqttPublishAvty()
 	String mtopic(config.mqttTopic);
 	String avty_topic = mtopic + "/avty";
 	String payloadString = "online";
-	mqttClient.publish(avty_topic.c_str(), 0, true, payloadString.c_str());
+	mqttClient.publish(avty_topic.c_str(), payloadString.c_str());
 #ifdef DEBUG
 	Serial.println("[ INFO ] Mqtt Publish: online @ " + avty_topic);
 #endif
@@ -391,18 +392,13 @@ void mqttPublishIo(String const &io, String const &state)
 		String mtopic(config.mqttTopic);
 		String topic = mtopic + "/io/" + io;
 
-		mqttClient.publish(topic.c_str(), 0, false, state.c_str());
+		mqttClient.publish(topic.c_str(), state.c_str());
 
 #ifdef DEBUG
 		Serial.print("[ INFO ] Mqtt Publish: ");
 		Serial.println(state + " @ " + topic);
 #endif
 	}
-}
-
-void onMqttPublish(uint16_t packetId)
-{
-	writeEvent("INFO", "mqtt", "MQTT publish acknowledged", String(packetId));
 }
 
 void getUserList()
@@ -472,20 +468,16 @@ void deleteUserID(const char *uid)
 	}
 }
 
-void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total)
+void onMqttMessage(String& topic, String& payload)
 {
-	size_t n = 0;
-	size_t i = index;
-	while(n < len) {
-		mqttBuffer[i] = payload[n];
-		n++;
-		i++;
-	}
-	if(index + len == total) {
-		mqttBuffer[i] = '\0';
-	} else {
+	if (payload.length() >= MAX_MQTT_BUFFER) {
+#ifdef DEBUG
+		Serial.println("[ INFO ] MQTT message too large, dropping");
+#endif
 		return;
 	}
+	payload.toCharArray(mqttBuffer, MAX_MQTT_BUFFER);
+
 #ifdef DEBUG
 	Serial.print("[ INFO ] JSON msg: ");
 	Serial.println(mqttBuffer);
@@ -551,7 +543,7 @@ void onMqttMessage(char *topic, char *payload, AsyncMqttClientMessageProperties 
 	if (!mqttIncomingJson["door"].isNull()) {
 		strlcpy(incomingMessage->door, mqttIncomingJson["door"], sizeof(incomingMessage->door));
 	}
-	strlcpy(incomingMessage->serializedMessage, mqttBuffer, sizeof(mqttBuffer));
+	strlcpy(incomingMessage->serializedMessage, mqttBuffer, sizeof(incomingMessage->serializedMessage));
 
 	MqttMessage* lastMessage = mqttMessageQueue;
 	if(lastMessage == NULL)
@@ -720,55 +712,6 @@ void processMqttMessage(MqttMessage *incomingMessage)
 	return;
 }
 
-void onMqttSubscribe(uint16_t packetId, uint8_t qos)
-{
-#ifdef DEBUG
-	Serial.println("[ INFO ] Subscribe acknowledged.");
-	Serial.print("[ INFO ] packetId: ");
-	Serial.println(packetId);
-	Serial.print("[ INFO ] qos: ");
-	Serial.println(qos);
-#endif
-}
-
-void onMqttConnect(bool sessionPresent)
-{
-#ifdef DEBUG
-	Serial.println("[ INFO ] MQTT Connected session");
-#endif
-	if (sessionPresent == true)
-	{
-#ifdef DEBUG
-		Serial.println("[ INFO ] MQTT session Present: True");
-#endif
-		writeEvent("INFO", "mqtt", "Connected to MQTT Server", "Session Present");
-	}
-	mqttPublishBoot(epoch);
-
-	String stopic(config.mqttTopic);
-	stopic = stopic + "/cmd";
-	mqttClient.subscribe(stopic.c_str(), 2);
-
-	if (config.mqttHA)
-	{
-		mqttPublishDiscovery();
-		mqttPublishAvty();
-		if (config.doorstatpin != 255)
-		{
-			mqttPublishIo("door", digitalRead(config.doorstatpin) == HIGH ? "OFF" : "ON");
-		}
-		if (config.doorbellpin != 255)
-		{
-			mqttPublishIo("doorbell", digitalRead(config.doorbellpin) == HIGH ? "ON" : "OFF");
-		}
-		for (int i = 0; i < config.numRelays; i++)
-		{
-			mqttPublishIo("lock" + String(i), digitalRead(config.relayPin[i]) == config.relayType[i] ? "UNLOCKED" : "LOCKED");
-		}
-		mqttPublishIo("tamper", "OFF");
-	}
-}
-
 void processMqttQueue()
 {
 	while (mqttMessageQueue != NULL)
@@ -781,7 +724,7 @@ void processMqttQueue()
 
 void setupMqtt()
 {
-  if (!config.mqttEnabled)
+	if (!config.mqttEnabled)
 	{
 		return;
 	}
@@ -789,20 +732,13 @@ void setupMqtt()
 #ifdef DEBUG
 	Serial.println("[ INFO ] Trying to setup MQTT");
 #endif
+	mqttClient.begin(config.mqttHost, config.mqttPort, mqttNet);
+	mqttClient.onMessage(onMqttMessage);
+
 	if (config.mqttHA)
 	{
 		String stopic(config.mqttTopic);
 		String topicString = stopic + "/avty";
-		String payloadString = "offline";
-		char *topicLWT = strdup(topicString.c_str());
-		char *payloadLWT = strdup(payloadString.c_str());
-		mqttClient.setWill(topicLWT, 2, true, payloadLWT);
+		mqttClient.setWill(topicString.c_str(), "offline");
 	}
-	mqttClient.setServer(config.mqttHost, config.mqttPort);
-	mqttClient.setCredentials(config.mqttUser, config.mqttPass);
-	mqttClient.onDisconnect(onMqttDisconnect);
-	mqttClient.onPublish(onMqttPublish);
-	mqttClient.onSubscribe(onMqttSubscribe);
-	mqttClient.onConnect(onMqttConnect);
-	mqttClient.onMessage(onMqttMessage);
 }
