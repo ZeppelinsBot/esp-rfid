@@ -22,7 +22,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
-#define VERSION "2.0.0-esp32c3"
+#define VERSION "2.0.0-esp32c3-20260904-r7"
 
 #include "Arduino.h"
 #include <WiFi.h>
@@ -158,7 +158,8 @@ void setup()
 		delay(10);
 	}
 	Serial.println();
-	Serial.println(F("[BOOT] ESP-RFID setup entered"));
+	Serial.print(F("[BOOT] ESP-RFID setup entered, version: "));
+	Serial.println(F(VERSION));
 
 #ifdef DEBUG
 	Serial.print(F("[ INFO ] ESP RFID v"));
