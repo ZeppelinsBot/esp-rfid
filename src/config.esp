@@ -11,6 +11,12 @@ bool loadConfiguration(::Config &config)
 	}
 	size_t size = configFile.size();
 	Serial.printf("[CFG] config size: %u\n", (unsigned)size);
+	if (size == 0 || size > 8192)
+	{
+		Serial.println(F("[CFG] invalid config size; ignoring config"));
+		configFile.close();
+		return false;
+	}
 	std::unique_ptr<char[]> buf(new char[size + 1]);
 	configFile.readBytes(buf.get(), size);
 	buf[size] = '\0';

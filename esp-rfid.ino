@@ -184,6 +184,8 @@ void setup()
 	}
 	Serial.println(F("[BOOT] SPIFFS ready"));
 
+	Serial.println(F("[BOOT] before config load"));
+	yield();
 	bool configured = false;
 	configured = loadConfiguration(config);
 	Serial.printf("[BOOT] config loaded: %s\n", configured ? "yes" : "no");
