@@ -84,7 +84,7 @@ void processWsMessage(WsMessage *incomingMessage)
 		if (f)
 		{
 			size_t len = 0;
-			while (incomingMessage->serializedMessage[len] != '\0' && len < MAX_WS_BUFFER)
+			while (len < MAX_WS_BUFFER && incomingMessage->serializedMessage[len] != '\0')
 			{
 				len++;
 			}
@@ -237,8 +237,13 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 		if (info->final && info->index == 0 && info->len == len)
 		{
 			//the whole message is in a single frame and we got all of it's data
-			client->_tempObject = malloc(info->len);
+			client->_tempObject = malloc(info->len + 1);
+			if (client->_tempObject == NULL)
+			{
+				return;
+			}
 			memcpy((uint8_t *)(client->_tempObject), data, len);
+			((uint8_t *)(client->_tempObject))[info->len] = '\0';
 			addWsMessageToQueue(client, info->len + 1);
 		}
 		else
@@ -248,7 +253,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 			{
 				if (info->num == 0 && client->_tempObject == NULL)
 				{
-					client->_tempObject = malloc(info->len);
+					client->_tempObject = malloc(info->len + 1);
 				}
 			}
 			if (client->_tempObject != NULL)
@@ -259,6 +264,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 			{
 				if (info->final)
 				{
+					((uint8_t *)(client->_tempObject))[info->len] = '\0';
 					addWsMessageToQueue(client, info->len + 1);
 				}
 			}
