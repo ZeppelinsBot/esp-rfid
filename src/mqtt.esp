@@ -14,6 +14,16 @@ struct MqttMessage {
 
 MqttMessage *mqttMessageQueue = NULL;
 
+// Forward declarations
+void mqttPublishBoot(time_t boot_time);
+void mqttPublishDiscovery();
+void mqttPublishAvty();
+void mqttPublishIo(String const &io, String const &state);
+void mqttPublishEvent(JsonDocument *root, String topic);
+void mqttPublishEvent(JsonDocument *root);
+void mqttPublishEventHA(JsonDocument *root, String topic);
+void onMqttConnect();
+
 void connectToMqtt()
 {
 	if (!config.mqttEnabled || mqttClient.connected()) {
@@ -81,23 +91,7 @@ void mqttPublishEvent(JsonDocument *root, String topic)
 		stopic = stopic + "/" + topic;
 		String mqttMsg;
 		serializeJson(*root, mqttMsg);
-		mqttClient.publish(stopic.c_str(), mqttMsg.c_str());
-#ifdef DEBUG
-		Serial.print("[ INFO ] Mqtt Publish:");
-		Serial.println(mqttMsg);
-#endif
-	}
-}
-
-void mqttPublishEventHA(JsonDocument *root, String topic)
-{
-	if (config.mqttEnabled && mqttClient.connected())
-	{
-		String stopic = "homeassistant/";
-		stopic = stopic + topic;
-		String mqttMsg;
-		serializeJson(*root, mqttMsg);
-		mqttClient.publish(stopic.c_str(), mqttMsg.c_str());
+		mqttClient.publish(stopic.c_str(), mqttMsg.c_str(), false, 0);
 #ifdef DEBUG
 		Serial.print("[ INFO ] Mqtt Publish:");
 		Serial.println(mqttMsg);
@@ -108,6 +102,22 @@ void mqttPublishEventHA(JsonDocument *root, String topic)
 void mqttPublishEvent(JsonDocument *root)
 {
 	mqttPublishEvent(root, "send");
+}
+
+void mqttPublishEventHA(JsonDocument *root, String topic)
+{
+	if (config.mqttEnabled && mqttClient.connected())
+	{
+		String stopic = "homeassistant/";
+		stopic = stopic + topic;
+		String mqttMsg;
+		serializeJson(*root, mqttMsg);
+		mqttClient.publish(stopic.c_str(), mqttMsg.c_str(), true, 0);
+#ifdef DEBUG
+		Serial.print("[ INFO ] Mqtt Publish HA:");
+		Serial.println(mqttMsg);
+#endif
+	}
 }
 
 void mqttPublishAck(String command)
@@ -293,7 +303,7 @@ void mqttPublishAvty()
 	String mtopic(config.mqttTopic);
 	String avty_topic = mtopic + "/avty";
 	String payloadString = "online";
-	mqttClient.publish(avty_topic.c_str(), payloadString.c_str());
+	mqttClient.publish(avty_topic.c_str(), payloadString.c_str(), true, 0);
 #ifdef DEBUG
 	Serial.println("[ INFO ] Mqtt Publish: online @ " + avty_topic);
 #endif
@@ -392,7 +402,7 @@ void mqttPublishIo(String const &io, String const &state)
 		String mtopic(config.mqttTopic);
 		String topic = mtopic + "/io/" + io;
 
-		mqttClient.publish(topic.c_str(), state.c_str());
+		mqttClient.publish(topic.c_str(), state.c_str(), false, 0);
 
 #ifdef DEBUG
 		Serial.print("[ INFO ] Mqtt Publish: ");
