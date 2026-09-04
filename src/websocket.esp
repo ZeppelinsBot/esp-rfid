@@ -208,10 +208,12 @@ void processWsMessage(WsMessage *incomingMessage)
 		if (configFile)
 		{
 			size_t len = configFile.size();
-			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len); //  creates a buffer (len + 1) for you.
+			// Reserve one extra byte because readBytes() needs a terminator.
+			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 			if (buffer)
 			{
-				configFile.readBytes((char *)buffer->get(), len + 1);
+				configFile.readBytes((char *)buffer->get(), len); 
+				((char *)buffer->get())[len] = '\0';
 				client->text(buffer);
 			}
 			configFile.close();
