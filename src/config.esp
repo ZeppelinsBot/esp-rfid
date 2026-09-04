@@ -1,5 +1,6 @@
 bool loadConfiguration(::Config &config)
 {
+	Serial.println(F("[CFG] open config"));
 	File configFile = SPIFFS.open("/config.json", "r");
 	if (!configFile)
 	{
@@ -9,8 +10,12 @@ bool loadConfiguration(::Config &config)
 		return false;
 	}
 	size_t size = configFile.size();
-	std::unique_ptr<char[]> buf(new char[size]);
+	Serial.printf("[CFG] config size: %u\n", (unsigned)size);
+	std::unique_ptr<char[]> buf(new char[size + 1]);
 	configFile.readBytes(buf.get(), size);
+	buf[size] = '\0';
+	configFile.close();
+	Serial.println(F("[CFG] parse config"));
 	JsonDocument json;
 	auto error = deserializeJson(json, buf.get(), size);
 	if (error)
@@ -28,6 +33,7 @@ bool loadConfiguration(::Config &config)
 	JsonObject general = json["general"];
 	JsonObject mqtt = json["mqtt"];
 	JsonObject ntp = json["ntp"];
+	Serial.println(F("[CFG] sections ready"));
 #ifdef DEBUG
 	Serial.println(F("[ INFO ] Trying to setup RFID Hardware"));
 #endif
@@ -159,6 +165,8 @@ bool loadConfiguration(::Config &config)
 		int rmd6300TxPin = hardware["rdm6300pin"];
 		setupRDM6300Reader(rmd6300TxPin);
 	}
+	Serial.println(F("[CFG] hardware setup done"));
+	yield();
 
 	if (!network["fallbackmode"].isNull())
 	{
@@ -166,8 +174,8 @@ bool loadConfiguration(::Config &config)
 	}
 	config.autoRestartIntervalSeconds = general["restart"];
 	config.wifiTimeout = network["offtime"];
-	const char *bssidmac = network["bssid"];
-	if (strlen(bssidmac) > 0)
+	const char *bssidmac = network["bssid"] | "";
+	if (bssidmac[0] != '\0')
 		parseBytes(bssidmac, ':', config.bssid, 6, 16);
 	if (!general["hostnm"].isNull())
 	{
@@ -215,6 +223,7 @@ bool loadConfiguration(::Config &config)
 	}
 
 	config.relayPin[0] = hardware["rpin"];
+	Serial.println(F("[CFG] configuring relay pins"));
 	pinMode(config.relayPin[0], OUTPUT);
 	digitalWrite(config.relayPin[0], !config.relayType[0]);
 
@@ -233,6 +242,7 @@ bool loadConfiguration(::Config &config)
 		digitalWrite(config.relayPin[i], !config.relayType[i]);
 	}
 
+	Serial.println(F("[CFG] loading network values"));
 	if (!network["ssid"].isNull())
 	{
 		config.ssid = strdup(network["ssid"]);
