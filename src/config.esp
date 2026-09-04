@@ -1,4 +1,4 @@
-bool ICACHE_FLASH_ATTR loadConfiguration(::Config &config)
+bool loadConfiguration(::Config &config)
 {
 	File configFile = SPIFFS.open("/config.json", "r");
 	if (!configFile)

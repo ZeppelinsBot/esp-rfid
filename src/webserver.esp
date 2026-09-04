@@ -1,4 +1,6 @@
-void ICACHE_FLASH_ATTR setupWebServer() {
+#include <Update.h>
+
+void setupWebServer() {
 	server.addHandler(&ws);
 	ws.onEvent(onWsEvent);
 	server.onNotFound([](AsyncWebServerRequest *request) {
@@ -15,8 +17,9 @@ void ICACHE_FLASH_ATTR setupWebServer() {
 		}
 		if (!index) {
 			writeEvent("INFO", "updt", "Firmware update started", filename.c_str());
-			Update.runAsync(true);
-			if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)) {
+			// ESP32: runAsync not needed, removed
+			// ESP32: useESP.getFreeSketchSpace() directly (no 0x1000 offset like ESP8266)
+			if (!Update.begin(ESP.getFreeSketchSpace())) {
 				writeEvent("ERRO", "updt", "Not enough space to update","");
 				#ifdef DEBUG
 				Update.printError(Serial);

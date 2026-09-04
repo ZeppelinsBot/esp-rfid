@@ -22,18 +22,18 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
-#define VERSION "2.0.0"
+#define VERSION "2.0.0-esp32c3"
 
 #include "Arduino.h"
-#include <ESP8266WiFi.h>
+#include <WiFi.h>
 #include <SPI.h>
-#include <ESP8266mDNS.h>
+#include <ESPmDNS.h>
 #include <ArduinoJson.h>
 #include <FS.h>
-#include <ESPAsyncTCP.h>
+#include <SPIFFS.h>
+#include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include <TimeLib.h>
-#include <Ticker.h>
 #include <time.h>
 #include <AsyncMqttClient.h>
 #include <Bounce2.h>
@@ -46,13 +46,13 @@ Config config;
 #include "PN532.h"
 #include <Wiegand.h>
 #include "rfid125kHz.h"
-#include <SoftwareSerial.h>
+#include <HardwareSerial.h>
 
 MFRC522 mfrc522 = MFRC522();
 PN532 pn532;
 WIEGAND wg;
 RFID_Reader RFIDr;
-SoftwareSerial *rdm6300SwSerial = NULL;
+HardwareSerial *rdm6300HwSerial = NULL;
 
 // relay specific variables
 bool activateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
@@ -69,10 +69,35 @@ bool deactivateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
 #include "webh/index.html.gz.h"
 
 AsyncMqttClient mqttClient;
-Ticker mqttReconnectTimer;
-Ticker wifiReconnectTimer;
-Ticker wsMessageTicker;
-WiFiEventHandler wifiDisconnectHandler, wifiConnectHandler, wifiOnStationModeGotIPHandler;
+
+// millis-based timers replacing Ticker
+unsigned long mqttReconnectTimerStart = 0;
+bool mqttReconnectTimerActive = false;
+unsigned long wifiReconnectTimerStart = 0;
+bool wifiReconnectTimerActive = false;
+
+// Ticker-like helper for deferred websocket send (replaces wsMessageTicker)
+typedef std::function<void(void)> WsTickerCallback;
+WsTickerCallback wsTickerCallback = nullptr;
+unsigned long wsTickerStart = 0;
+bool wsTickerActive = false;
+
+void wsTickerOnce(unsigned long ms, WsTickerCallback cb) {
+	wsTickerCallback = cb;
+	wsTickerStart = millis();
+	wsTickerActive = true;
+}
+
+void processWsTicker() {
+	if (wsTickerActive && millis() - wsTickerStart >= 50) {
+		wsTickerActive = false;
+		if (wsTickerCallback) {
+			wsTickerCallback();
+			wsTickerCallback = nullptr;
+		}
+	}
+}
+
 Bounce openLockButton;
 
 AsyncWebServer server(80);
@@ -122,7 +147,7 @@ unsigned long wiFiUptimeMillis = 0;
 #include "door.esp"
 #include "doorbell.esp"
 
-void ICACHE_FLASH_ATTR setup()
+void setup()
 {
 #ifdef DEBUG
 	Serial.begin(115200);
@@ -131,28 +156,13 @@ void ICACHE_FLASH_ATTR setup()
 	Serial.print(F("[ INFO ] ESP RFID v"));
 	Serial.println(VERSION);
 
-	uint32_t realSize = ESP.getFlashChipRealSize();
-	uint32_t ideSize = ESP.getFlashChipSize();
-	FlashMode_t ideMode = ESP.getFlashChipMode();
-	Serial.printf("Flash real id:   %08X\n", ESP.getFlashChipId());
-	Serial.printf("Flash real size: %u\n\n", realSize);
-	Serial.printf("Flash ide  size: %u\n", ideSize);
-	Serial.printf("Flash ide speed: %u\n", ESP.getFlashChipSpeed());
-	Serial.printf("Flash ide mode:  %s\n", (ideMode == FM_QIO ? "QIO" : ideMode == FM_QOUT ? "QOUT"
-																	: ideMode == FM_DIO	   ? "DIO"
-																	: ideMode == FM_DOUT   ? "DOUT"
-																						   : "UNKNOWN"));
-	if (ideSize != realSize)
-	{
-		Serial.println("Flash Chip configuration wrong!\n");
-	}
-	else
-	{
-		Serial.println("Flash Chip configuration ok.\n");
-	}
+	Serial.printf("Flash chip size: %u bytes\n", ESP.getFlashChipSize());
+	Serial.printf("Free heap: %u bytes\n", ESP.getFreeHeap());
+	Serial.printf("CPU freq: %u MHz\n", ESP.getCpuFreqMHz());
+	Serial.printf("SDK version: %s\n", ESP.getSdkVersion());
 #endif
 
-	if (!SPIFFS.begin())
+	if (!SPIFFS.begin(true))
 	{
 		if (SPIFFS.format())
 		{
@@ -175,7 +185,7 @@ void ICACHE_FLASH_ATTR setup()
 	writeEvent("INFO", "sys", "System setup completed, running", "");
 }
 
-void ICACHE_RAM_ATTR loop()
+void loop()
 {
 	currentMillis = millis();
 	deltaTime = currentMillis - previousLoopMillis;
@@ -199,6 +209,17 @@ void ICACHE_RAM_ATTR loop()
 	beeperBeep();
 	doorStatus();
 	doorbellStatus();
+
+	// Process millis-based timers (replaces Ticker)
+	if (mqttReconnectTimerActive && currentMillis - mqttReconnectTimerStart >= 60000) {
+		mqttReconnectTimerActive = false;
+		connectToMqtt();
+	}
+	if (wifiReconnectTimerActive && currentMillis - wifiReconnectTimerStart >= 300000) {
+		wifiReconnectTimerActive = false;
+		setEnableWifi();
+	}
+	processWsTicker();
 
 	if ((long)(currentMillis - cooldown) >= 0)
 	{

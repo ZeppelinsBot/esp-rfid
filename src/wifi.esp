@@ -3,20 +3,22 @@ void setEnableWifi()
 	doEnableWifi = true;
 }
 
-void onWifiConnect(const WiFiEventStationModeConnected &event)
+// ESP32 WiFi event handlers
+void onWifiConnect(arduino_event_id_t event)
 {
 #ifdef DEBUG
 	Serial.println(F("[ INFO ] WiFi STA Connected"));
 #endif
-	mqttReconnectTimer.detach();
-	if (!wifiReconnectTimer.active() && !config.fallbackMode)
+	mqttReconnectTimerActive = false;
+	if (!wifiReconnectTimerActive && !config.fallbackMode)
 	{
-		wifiReconnectTimer.once(300, setEnableWifi);
+		wifiReconnectTimerStart = millis();
+		wifiReconnectTimerActive = true;
 	}
 	ledWifiOff();
 }
 
-void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
+void onWifiDisconnect(arduino_event_id_t event)
 {
 	if ( !WiFi.isConnected() )
 	{
@@ -25,27 +27,28 @@ void onWifiDisconnect(const WiFiEventStationModeDisconnected &event)
 #ifdef DEBUG
 	Serial.println(F("[ INFO ] WiFi STA Disconnected"));
 #endif
-	mqttReconnectTimer.detach();
+	mqttReconnectTimerActive = false;
 	disconnectMqtt();
-	if (!wifiReconnectTimer.active() && !config.fallbackMode)
+	if (!wifiReconnectTimerActive && !config.fallbackMode)
 	{
-		wifiReconnectTimer.once(300, setEnableWifi);
+		wifiReconnectTimerStart = millis();
+		wifiReconnectTimerActive = true;
 	}
 	ledWifiOff();
 }
 
-void onWifiGotIP(const WiFiEventStationModeGotIP &event)
+void onWifiGotIP(arduino_event_id_t event)
 {
 #ifdef DEBUG
 	Serial.print("[ INFO ] WiFi IP Connected: ");
 	Serial.println(WiFi.localIP().toString());
 #endif
-	wifiReconnectTimer.detach();
+	wifiReconnectTimerActive = false;
 	ledWifiOn();
 	connectToMqtt();
 }
 
-bool ICACHE_FLASH_ATTR startAP(IPAddress apip, IPAddress apsubnet, bool hidden, const char *ssid, const char *password = NULL)
+bool startAP(IPAddress apip, IPAddress apsubnet, bool hidden, const char *ssid, const char *password = NULL)
 {
 #ifdef DEBUG
 	Serial.println(F("[ INFO ] ESP-RFID is running in AP Mode "));
@@ -86,7 +89,7 @@ bool ICACHE_FLASH_ATTR startAP(IPAddress apip, IPAddress apsubnet, bool hidden, 
 }
 
 // Fallback to AP Mode, so we can connect to ESP if there is no Internet connection
-void ICACHE_FLASH_ATTR fallbacktoAPMode()
+void fallbacktoAPMode()
 {
 	config.accessPointMode = true;
 #ifdef DEBUG
@@ -111,7 +114,7 @@ void ICACHE_FLASH_ATTR fallbacktoAPMode()
 }
 
 // Try to connect Wi-Fi
-bool ICACHE_FLASH_ATTR connectSTA(const char *ssid, const char *password, byte bssid[6])
+bool connectSTA(const char *ssid, const char *password, byte bssid[6])
 {
 	bool useBSSID = false;
 	WiFi.mode(WIFI_STA);
@@ -186,13 +189,14 @@ bool ICACHE_FLASH_ATTR connectSTA(const char *ssid, const char *password, byte b
 				Serial.println();
 				Serial.println(F("[ INFO ] trying to reconnect to WiFi"));
 			#endif
-			wifiReconnectTimer.once(300, setEnableWifi);
+			wifiReconnectTimerStart = millis();
+			wifiReconnectTimerActive = true;
 		}
 		return false;
 	}
 }
 
-void ICACHE_FLASH_ATTR disableWifi()
+void disableWifi()
 {
 	wiFiUptimeMillis = 0;
 	WiFi.disconnect(true);
@@ -202,7 +206,7 @@ void ICACHE_FLASH_ATTR disableWifi()
 #endif
 }
 
-void ICACHE_FLASH_ATTR enableWifi()
+void enableWifi()
 {
 	wiFiUptimeMillis = 0;
 	if (config.accessPointMode)
@@ -227,9 +231,10 @@ void setupWifi(bool configured)
 		fallbacktoAPMode();
 	} else
 	{
-		wifiConnectHandler = WiFi.onStationModeConnected(onWifiConnect);
-		wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
-		wifiOnStationModeGotIPHandler = WiFi.onStationModeGotIP(onWifiGotIP);
+		// ESP32 WiFi event registration
+		WiFi.onEvent(onWifiConnect, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
+		WiFi.onEvent(onWifiDisconnect, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+		WiFi.onEvent(onWifiGotIP, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_GOT_IP);
 		WiFi.hostname(config.deviceHostname);
 		enableWifi();
 	}

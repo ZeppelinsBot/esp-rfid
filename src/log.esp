@@ -1,6 +1,6 @@
 void extern mqttPublishEvent(JsonDocument *root);
 
-void ICACHE_FLASH_ATTR writeEvent(String type, String src, String desc, String data)
+void writeEvent(String type, String src, String desc, String data)
 {
 	JsonDocument root;
 	root["type"] = type;
@@ -26,7 +26,7 @@ void ICACHE_FLASH_ATTR writeEvent(String type, String src, String desc, String d
 #endif
 }
 
-void ICACHE_FLASH_ATTR writeLatest(String uid, String username, int acctype, int access = ACCESS_GRANTED)
+void writeLatest(String uid, String username, int acctype, int access = ACCESS_GRANTED)
 {
 	JsonDocument root;
 	root["uid"] = uid;
@@ -47,7 +47,7 @@ size_t lastPos; // position counter for fast seek
 #define FILES_PER_PAGE 10.0
 #define MIN_SPIFF_BYTES 4096
 
-void ICACHE_FLASH_ATTR sendLogFile(int page, String fileName, int logFileType, AsyncWebSocketClient *client)
+void sendLogFile(int page, String fileName, int logFileType, AsyncWebSocketClient *client)
 {
 
 	// if we are reading the first page then we reset
@@ -119,7 +119,7 @@ void ICACHE_FLASH_ATTR sendLogFile(int page, String fileName, int logFileType, A
 	}
 }
 
-void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSocketClient *client)
+void logMaintenance(String action, String filename, AsyncWebSocketClient *client)
 {
 #ifdef DEBUG
 	Serial.printf("[DEBUG] Log Maintenance Action: %s on %s\n", action.c_str(), filename.c_str());
@@ -158,8 +158,8 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 		File newFile1 = SPIFFS.open(filename + ".split." + rolloverExtension1, "w");
 		File newFile2 = SPIFFS.open(filename + ".split." + rolloverExtension2, "w");
 
-		FSInfo fs_info;
-		SPIFFS.info(fs_info);
+		size_t totalBytes = SPIFFS.totalBytes();
+		size_t usedBytes = SPIFFS.usedBytes();
 
 		size_t truncatePosition = logFile.size() / 2;
 		logFile.seek(truncatePosition);
@@ -169,7 +169,7 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 
 		// check if we have enough space for the split operation
 
-		if ((fs_info.totalBytes - fs_info.usedBytes) < (logFile.size() + MIN_SPIFF_BYTES))
+		if ((totalBytes - usedBytes) < (logFile.size() + MIN_SPIFF_BYTES))
 		{
 			if (client)
 			{
@@ -179,10 +179,7 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 		else
 		{
 
-			// mind the watchdog timer - this may take a couple of seconds...
-
-			ESP.wdtDisable();
-			ESP.wdtEnable(1500);
+			// ESP32: no explicit WDT disable needed for simple file operations
 
 			// read the first half of the file
 
@@ -191,7 +188,7 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 				String item = String();
 				item = logFile.readStringUntil('\n');
 				newFile1.println(item);
-				ESP.wdtFeed(); // tell the watchdog we're still doing stuff
+				yield(); // yield to keep system alive
 			}
 
 			// read the rest
@@ -201,7 +198,7 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 				String item = String();
 				item = logFile.readStringUntil('\n');
 				newFile2.println(item);
-				ESP.wdtFeed(); // no reset please ;-)
+				yield(); // yield to keep system alive
 			}
 
 			logFile.close();
@@ -210,14 +207,13 @@ void ICACHE_FLASH_ATTR logMaintenance(String action, String filename, AsyncWebSo
 		}
 	}
 
-	ESP.wdtEnable(5000);
 	if (client)
 	{
 		client->text("{\"command\":\"result\",\"resultof\":\"logfileMaintenance\",\"result\": true}");
 	}
 }
 
-void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
+void sendFileList(int page, AsyncWebSocketClient *client)
 {
 
 	JsonDocument root;
@@ -229,24 +225,37 @@ void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
 	size_t last = page * FILES_PER_PAGE;
 	size_t numFiles = 0;
 
-	Dir dir = SPIFFS.openDir("/");
-	while (dir.next())
+	// ESP32 SPIFFS directory iteration
+	File rootDir = SPIFFS.open("/");
+	if (!rootDir || !rootDir.isDirectory()) {
+		root["haspages"] = 0;
+		size_t len = measureJson(root);
+		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+		if (buffer) {
+			serializeJson(root, (char *)buffer->get(), len + 1);
+			client->text(buffer);
+			client->text("{\"command\":\"result\",\"resultof\":\"listfiles\",\"result\": true}");
+		}
+		return;
+	}
+
+	File file = rootDir.openNextFile();
+	while (file)
 	{
-
-		//	if (dir.isFile()) // isFile is implemented in Arduino Core 2.5.1 - We'll have to wait for the ISR not in IRAM fix
-
-		String thisFileName = dir.fileName();
+		String thisFileName = String(file.name());
 		if ((thisFileName.indexOf("latestlog") >= 0) || (thisFileName.indexOf("eventlog") >= 0)) // for the time being we just check filenames
 		{
 			if (numFiles >= first && numFiles < last)
 			{
 				JsonObject item = items.add<JsonObject>();
-				item["filename"] = dir.fileName();
-				item["filesize"] = dir.fileSize();
+				item["filename"] = thisFileName;
+				item["filesize"] = file.size();
 			} // first, last
 			numFiles++;
 		} // isFile
+		file = rootDir.openNextFile();
 	}	  // dir next
+	rootDir.close();
 
 	float pages = numFiles / FILES_PER_PAGE;
 	root["haspages"] = ceil(pages);
@@ -261,14 +270,14 @@ void ICACHE_FLASH_ATTR sendFileList(int page, AsyncWebSocketClient *client)
 	}
 }
 
-void ICACHE_FLASH_ATTR sendEventLog(int page, String fileName, AsyncWebSocketClient *client)
+void sendEventLog(int page, String fileName, AsyncWebSocketClient *client)
 {
 	if (fileName.length() == 0)
 		fileName = "/eventlog.json";
 	sendLogFile(page, fileName, LOGTYPE_EVENTLOG, client);
 }
 
-void ICACHE_FLASH_ATTR sendLatestLog(int page, String fileName, AsyncWebSocketClient *client)
+void sendLatestLog(int page, String fileName, AsyncWebSocketClient *client)
 {
 	if (fileName.length() == 0)
 		fileName = "/latestlog.json";

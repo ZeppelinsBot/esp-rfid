@@ -59,9 +59,6 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 	case (AsyncMqttClientDisconnectReason::MQTT_NOT_AUTHORIZED):
 		reasonstr = "MQTT_NOT_AUTHORIZED";
 		break;
-	case (AsyncMqttClientDisconnectReason::ESP8266_NOT_ENOUGH_SPACE):
-		reasonstr = "ESP8266_NOT_ENOUGH_SPACE";
-		break;
 	default:
 		reasonstr = "Unknown";
 		break;
@@ -70,7 +67,8 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
 	if (WiFi.isConnected())
 	{
-		mqttReconnectTimer.once(60, connectToMqtt);
+		mqttReconnectTimerStart = millis();
+		mqttReconnectTimerActive = true;
 	}
 }
 
@@ -411,38 +409,55 @@ void getUserList()
 {
 	JsonDocument root;
 	JsonArray users = root["list"].to<JsonArray>();
-	Dir dir = SPIFFS.openDir("/P/");
 #ifdef DEBUG
 	Serial.println("[ INFO ] getUserList");
 #endif
-	while (dir.next())
-	{
-		JsonObject item = users.add<JsonObject>();
-		String uid = dir.fileName();
-		uid.remove(0, 3);
-		item["uid"] = uid;
-		File f = SPIFFS.open(dir.fileName(), "r");
-		size_t size = f.size();
-		std::unique_ptr<char[]> buf(new char[size]);
-		f.readBytes(buf.get(), size);
-		JsonDocument json;
-		auto error = deserializeJson(json, buf.get(), size);
-		if (!error)
-		{
-			mqttPublishEvent(&json);
-		}
+	// ESP32 SPIFFS directory iteration
+	File rootDir = SPIFFS.open("/P/");
+	if (!rootDir || !rootDir.isDirectory()) {
+#ifdef DEBUG
+		Serial.println("[ WARN ] Failed to open /P/ directory");
+#endif
+		return;
 	}
+	File file = rootDir.openNextFile();
+	while (file)
+	{
+		String fileName = String(file.name());
+		if (fileName.startsWith("/P/")) {
+			JsonObject item = users.add<JsonObject>();
+			String uidStr = fileName;
+			uidStr.remove(0, 3);
+			item["uid"] = uidStr;
+			size_t size = file.size();
+			std::unique_ptr<char[]> buf(new char[size]);
+			file.readBytes(buf.get(), size);
+			JsonDocument json;
+			auto error = deserializeJson(json, buf.get(), size);
+			if (!error)
+			{
+				mqttPublishEvent(&json);
+			}
+		}
+		file = rootDir.openNextFile();
+	}
+	rootDir.close();
 }
 
 void deleteAllUserFiles()
 {
-	Dir dir = SPIFFS.openDir("/P/");
-	while (dir.next())
+	File rootDir = SPIFFS.open("/P/");
+	if (!rootDir || !rootDir.isDirectory()) return;
+	File file = rootDir.openNextFile();
+	while (file)
 	{
-		String uid = dir.fileName();
-		uid.remove(0, 3);
-		SPIFFS.remove(dir.fileName());
+		String fileName = String(file.name());
+		if (fileName.startsWith("/P/")) {
+			SPIFFS.remove(fileName);
+		}
+		file = rootDir.openNextFile();
 	}
+	rootDir.close();
 }
 
 void deleteUserID(const char *uid)
@@ -450,16 +465,9 @@ void deleteUserID(const char *uid)
 	// only do this if a user id has been provided
 	if (uid)
 	{
-		Dir dir = SPIFFS.openDir("/P/");
-		while (dir.next())
-		{
-			String user_id = dir.fileName();
-			String myuid = uid;
-			user_id.remove(0, 3);
-			if (myuid == user_id)
-			{
-				SPIFFS.remove(dir.fileName());
-			}
+		String targetFile = "/P/" + String(uid);
+		if (SPIFFS.exists(targetFile)) {
+			SPIFFS.remove(targetFile);
 		}
 	}
 }
