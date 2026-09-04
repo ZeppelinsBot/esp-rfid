@@ -170,6 +170,7 @@ void setup()
 	Serial.printf("SDK version: %s\n", ESP.getSdkVersion());
 #endif
 
+	Serial.println(F("[BOOT] SPIFFS init"));
 	if (!SPIFFS.begin(true))
 	{
 		if (SPIFFS.format())
@@ -178,20 +179,23 @@ void setup()
 		}
 		else
 		{
-#ifdef DEBUG
-			Serial.println(F(" failed!"));
-			Serial.println(F("[ WARN ] Could not format filesystem!"));
-#endif
+			Serial.println(F("[WARN] Could not format filesystem!"));
 		}
 	}
+	Serial.println(F("[BOOT] SPIFFS ready"));
 
 	bool configured = false;
 	configured = loadConfiguration(config);
+	Serial.printf("[BOOT] config loaded: %s\n", configured ? "yes" : "no");
 	// Initialize WiFi before networking clients (ESP32/LWIP requires this order).
 	setupWifi(configured);
+	Serial.println(F("[BOOT] WiFi setup done"));
 	setupMqtt();
+	Serial.println(F("[BOOT] MQTT setup done"));
 	setupWebServer();
+	Serial.println(F("[BOOT] Webserver setup done"));
 	writeEvent("INFO", "sys", "System setup completed, running", "");
+	Serial.println(F("[BOOT] setup complete"));
 }
 
 void loop()
