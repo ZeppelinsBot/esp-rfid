@@ -540,7 +540,7 @@ void rfidOutsideMessaging()
 		root["type"] = type;
 		root["known"] = 0;
 		size_t len = measureJson(root);
-		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 		if (buffer)
 		{
 			serializeJson(root, (char *)buffer->get(), len + 1);
@@ -560,7 +560,7 @@ void rfidOutsideMessaging()
 		root["acctype"] = accountType;
 		root["user"] = username;
 		size_t len = measureJson(root);
-		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 		if (buffer)
 		{
 			serializeJson(root, (char *)buffer->get(), len + 1);

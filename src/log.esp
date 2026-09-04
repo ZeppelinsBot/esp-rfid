@@ -107,7 +107,7 @@ void sendLogFile(int page, String fileName, int logFileType, AsyncWebSocketClien
 	logFile.close();
 	root["haspages"] = ceil(pages);
 	size_t len = measureJson(root);
-	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 	if (buffer)
 	{
 		serializeJson(root, (char *)buffer->get(), len + 1);
@@ -230,7 +230,7 @@ void sendFileList(int page, AsyncWebSocketClient *client)
 	if (!rootDir || !rootDir.isDirectory()) {
 		root["haspages"] = 0;
 		size_t len = measureJson(root);
-		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 		if (buffer) {
 			serializeJson(root, (char *)buffer->get(), len + 1);
 			client->text(buffer);
@@ -261,7 +261,7 @@ void sendFileList(int page, AsyncWebSocketClient *client)
 	root["haspages"] = ceil(pages);
 
 	size_t len = measureJson(root);
-	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len);
+	AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 	if (buffer)
 	{
 		serializeJson(root, (char *)buffer->get(), len + 1);
