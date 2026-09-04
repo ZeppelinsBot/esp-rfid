@@ -40,6 +40,13 @@ bool loadConfiguration(::Config &config)
 	JsonObject mqtt = json["mqtt"];
 	JsonObject ntp = json["ntp"];
 	Serial.println(F("[CFG] sections ready"));
+	// Do not initialize hardware from an empty or truncated JSON object.
+	// A previous GUI save produced {} and left all reader values undefined.
+	if (network.isNull() || hardware.isNull() || general.isNull() || ntp.isNull())
+	{
+		Serial.println(F("[CFG] required sections missing; ignoring config"));
+		return false;
+	}
 #ifdef DEBUG
 	Serial.println(F("[ INFO ] Trying to setup RFID Hardware"));
 #endif
