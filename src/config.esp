@@ -202,9 +202,9 @@ bool loadConfiguration(::Config &config)
 		config.tzInfo = (char *) malloc(strlen(ntp["tzinfo"]) * sizeof(char));
 		config.tzInfo = strdup(ntp["tzinfo"]);
 	}
-	configTime(0, 0, config.ntpServer);
-	// See https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv for Timezone codes for your region
-	setenv("TZ", config.tzInfo, 1);
+	// NTP/LWIP initialization is deliberately deferred until WiFi is ready.
+	// Calling configTime() here can trigger an ESP32-C3 tcpip watchdog reset
+	// while loadConfiguration() is still running.
 
 	config.activateTime[0] = hardware["rtime"];
 	config.lockType[0] = hardware["ltype"];

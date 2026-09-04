@@ -190,6 +190,11 @@ void setup()
 	// Initialize WiFi before networking clients (ESP32/LWIP requires this order).
 	setupWifi(configured);
 	Serial.println(F("[BOOT] WiFi setup done"));
+	// Start NTP only after WiFi/LWIP is initialized.
+	configTime(0, 0, config.ntpServer);
+	setenv("TZ", config.tzInfo ? config.tzInfo : "UTC", 1);
+	tzset();
+	Serial.println(F("[BOOT] Time setup done"));
 	setupMqtt();
 	Serial.println(F("[BOOT] MQTT setup done"));
 	setupWebServer();
