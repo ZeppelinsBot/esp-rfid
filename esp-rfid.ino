@@ -180,9 +180,10 @@ void setup()
 
 	bool configured = false;
 	configured = loadConfiguration(config);
+	// Initialize WiFi before networking clients (ESP32/LWIP requires this order).
+	setupWifi(configured);
 	setupMqtt();
 	setupWebServer();
-	setupWifi(configured);
 	writeEvent("INFO", "sys", "System setup completed, running", "");
 }
 
