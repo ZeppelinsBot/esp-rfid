@@ -86,7 +86,7 @@ void processWsMessage(WsMessage *incomingMessage)
 		File f = SPIFFS.open("/config.json", "w");
 		if (f)
 		{
-			size_t written = serializeJson(root, f);
+			size_t written = serializeJson(root["configfile"], f);
 			f.close();
 			if (written > 0)
 			{
