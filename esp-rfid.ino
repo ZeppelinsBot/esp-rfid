@@ -37,15 +37,15 @@ SOFTWARE.
 #include <time.h>
 #include <MQTTClient.h>
 #include <Bounce2.h>
-#include "magicnumbers.h"
-#include "config.h"
+#include "src/magicnumbers.h"
+#include "src/config.h"
 
 Config config;
 
 #include <MFRC522.h>
-#include "PN532.h"
+#include "src/PN532.h"
 #include <Wiegand.h>
-#include "rfid125kHz.h"
+#include "src/rfid125kHz.h"
 #include <HardwareSerial.h>
 
 MFRC522 mfrc522 = MFRC522();
@@ -59,14 +59,14 @@ bool activateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
 bool deactivateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
 
 // these are from vendors
-#include "webh/glyphicons-halflings-regular.woff.gz.h"
-#include "webh/required.css.gz.h"
-#include "webh/required.js.gz.h"
+#include "src/webh/glyphicons-halflings-regular.woff.gz.h"
+#include "src/webh/required.css.gz.h"
+#include "src/webh/required.js.gz.h"
 
 // these are from us which can be updated and changed
-#include "webh/esprfid.js.gz.h"
-#include "webh/esprfid.htm.gz.h"
-#include "webh/index.html.gz.h"
+#include "src/webh/esprfid.js.gz.h"
+#include "src/webh/esprfid.htm.gz.h"
+#include "src/webh/index.html.gz.h"
 
 WiFiClient mqttNet;
 MQTTClient mqttClient(2048);
@@ -134,19 +134,19 @@ unsigned long uptimeSeconds = 0;
 unsigned long wifiPinBlink = millis();
 unsigned long wiFiUptimeMillis = 0;
 
-#include "led.esp"
-#include "beeper.esp"
-#include "log.esp"
-#include "mqtt.esp"
-#include "helpers.esp"
-#include "wsResponses.esp"
-#include "rfid.esp"
-#include "wifi.esp"
-#include "config.esp"
-#include "websocket.esp"
-#include "webserver.esp"
-#include "door.esp"
-#include "doorbell.esp"
+#include "src/led.esp"
+#include "src/beeper.esp"
+#include "src/log.esp"
+#include "src/mqtt.esp"
+#include "src/helpers.esp"
+#include "src/wsResponses.esp"
+#include "src/rfid.esp"
+#include "src/wifi.esp"
+#include "src/config.esp"
+#include "src/websocket.esp"
+#include "src/webserver.esp"
+#include "src/door.esp"
+#include "src/doorbell.esp"
 
 void setup()
 {
