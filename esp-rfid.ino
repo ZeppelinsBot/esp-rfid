@@ -150,10 +150,17 @@ unsigned long wiFiUptimeMillis = 0;
 
 void setup()
 {
-#ifdef DEBUG
+	// Keep startup diagnostics enabled even when DEBUG is not defined.
+	// Required for ESP32-C3 native USB CDC serial troubleshooting.
 	Serial.begin(115200);
+	unsigned long serialWaitStart = millis();
+	while (!Serial && (millis() - serialWaitStart < 1500)) {
+		delay(10);
+	}
 	Serial.println();
+	Serial.println(F("[BOOT] ESP-RFID setup entered"));
 
+#ifdef DEBUG
 	Serial.print(F("[ INFO ] ESP RFID v"));
 	Serial.println(VERSION);
 
