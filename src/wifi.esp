@@ -179,19 +179,17 @@ bool connectSTA(const char *ssid, const char *password, byte bssid[6])
 	}
 	else
 	{
-#ifdef DEBUG
 		Serial.println();
-		Serial.println(F("[ WARN ] Couldn't connect in time"));
-#endif
-		if (!config.fallbackMode)
-		{
-			#ifdef DEBUG
-				Serial.println();
-				Serial.println(F("[ INFO ] trying to reconnect to WiFi"));
-			#endif
-			wifiReconnectTimerStart = millis();
-			wifiReconnectTimerActive = true;
-		}
+		Serial.printf("[WARN] WiFi connect failed, status=%d\n", WiFi.status());
+		Serial.printf("[WARN] SSID: %s\n", ssid ? ssid : "(null)");
+
+		// Always provide a recovery AP after the initial connection fails.
+		// Previously this depended on fallbackMode and could leave the device
+		// unreachable with neither STA nor AP active.
+		Serial.println(F("[BOOT] Starting fallback access point"));
+		fallbacktoAPMode();
+		Serial.print(F("[BOOT] Fallback AP IP: "));
+		Serial.println(WiFi.softAPIP());
 		return false;
 	}
 }
