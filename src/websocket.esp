@@ -80,13 +80,14 @@ void processWsMessage(WsMessage *incomingMessage)
 	}
 	else if (strcmp(command, "configfile") == 0)
 	{
-		// Write the parsed JSON, not the raw WebSocket buffer. The old code
-		// capped the raw message at MAX_WS_BUFFER (2048 bytes), truncating
-		// larger configurations and losing WiFi/MQTT settings on reboot.
+		// The browser sends the config sections at the top level:
+		// {"command":"configfile","network":{...},"hardware":{...},...}
+		// Strip the command key and write the rest to the config file.
+		root.remove("command");
 		File f = SPIFFS.open("/config.json", "w");
 		if (f)
 		{
-			size_t written = serializeJson(root["configfile"], f);
+			size_t written = serializeJson(root, f);
 			f.close();
 			if (written > 0)
 			{
