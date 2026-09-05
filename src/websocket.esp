@@ -69,6 +69,7 @@ void processWsMessage(WsMessage *incomingMessage)
 	}
 	// Web Browser sends some commands, check which command is given
 	const char *command = root["command"];
+	Serial.printf("[WS] cmd: %s\r\n", command ? command : "(null)");
 	// Check whatever the command is and act accordingly
 	if (strcmp(command, "remove") == 0)
 	{
@@ -238,9 +239,15 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
 {
 	if (type == WS_EVT_ERROR)
 	{
-#ifdef DEBUG
-		Serial.printf("[ WARN ] WebSocket[%s][%u] error(%u): %s\r\n", server->url(), client->id(), *((uint16_t *)arg), (char *)data);
-#endif
+		Serial.printf("[WS] ERROR [%s][%u] %u: %s\r\n", server->url(), client->id(), *((uint16_t *)arg), (char *)data);
+	}
+	else if (type == WS_EVT_CONNECT)
+	{
+		Serial.printf("[WS] CONNECT client %u (total: %u)\r\n", client->id(), ws.count());
+	}
+	else if (type == WS_EVT_DISCONNECT)
+	{
+		Serial.printf("[WS] DISCONNECT client %u\r\n", client->id());
 	}
 	else if (type == WS_EVT_DATA)
 	{
