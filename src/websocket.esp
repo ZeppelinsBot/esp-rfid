@@ -213,16 +213,19 @@ void processWsMessage(WsMessage *incomingMessage)
 		File configFile = SPIFFS.open("/config.json", "r");
 		if (configFile)
 		{
-			size_t len = configFile.size();
-			// Reserve one extra byte because readBytes() needs a terminator.
+			// Read file into JsonDocument, add command key so the JS
+			// socketMessageListener matches the "configfile" case.
+			JsonDocument doc;
+			deserializeJson(doc, configFile);
+			configFile.close();
+			doc["command"] = "configfile";
+			size_t len = measureJson(doc);
 			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 			if (buffer)
 			{
-				configFile.readBytes((char *)buffer->get(), len); 
-				((char *)buffer->get())[len] = '\0';
+				serializeJson(doc, (char *)buffer->get(), len + 1);
 				client->text(buffer);
 			}
-			configFile.close();
 		}
 	}
 	free(incomingMessage->serializedMessage);
