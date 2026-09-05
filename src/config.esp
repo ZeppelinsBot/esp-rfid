@@ -317,7 +317,9 @@ bool loadConfiguration(::Config &config)
 	config.accessPointIp.fromString(apipch);
 	config.accessPointSubnetIp.fromString(apsubnetch);
 
-	ws.setAuthentication("admin", config.httpPass);
+	// WebSocket auth disabled: the standard JS WebSocket API cannot send
+	// Authorization headers, so ws.setAuthentication blocks all WS traffic.
+	// The HTTP /login endpoint already provides Basic Auth protection.
 
 	for (int d = 0; d < 7; d++)
 	{
