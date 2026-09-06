@@ -225,7 +225,7 @@ void processWsMessage(WsMessage *incomingMessage)
 			if (buffer)
 			{
 				serializeJson(doc, (char *)buffer->get(), len + 1);
-				ws.text(client, (const char *)buffer->get(), len);
+				client->text((const char *)buffer->get(), len);
 			}
 		}
 	}
