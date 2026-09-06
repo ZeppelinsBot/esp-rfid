@@ -1,3 +1,18 @@
+// Helper: send JSON without trailing null byte
+void wsSendJson(AsyncWebSocketClient *client, JsonDocument &doc) {
+	size_t len = measureJson(doc);
+	char *buf = (char *)malloc(len + 1);
+	if (buf) {
+		serializeJson(doc, buf, len + 1);
+		if (client) {
+			ws.text(client, buf, len);
+		} else {
+			ws.textAll(buf, len);
+		}
+		free(buf);
+	}
+}
+
 void sendUserList(int page, AsyncWebSocketClient *client)
 {
 	JsonDocument root;
@@ -17,7 +32,7 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 		if (buffer) {
 			serializeJson(root, (char *)buffer->get(), len + 1);
 			if (client) {
-				client->text(buffer);
+				ws.text(client, (const char *)buffer->get(), len);
 				client->text("{\"command\":\"result\",\"resultof\":\"userlist\",\"result\": true}");
 			} else {
 				ws.textAll("{\"command\":\"result\",\"resultof\":\"userlist\",\"result\": false}");
@@ -86,8 +101,8 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 		{
 			// ESP32: use millis-based timer instead of Ticker
 			AsyncWebSocketClient *capturedClient = client;
-			wsTickerOnce(50, [capturedClient, buffer]() {
-				capturedClient->text(buffer);
+			wsTickerOnce(50, [capturedClient, buffer, len]() {
+				ws.text(capturedClient, (const char *)buffer->get(), len);
 				capturedClient->text("{\"command\":\"result\",\"resultof\":\"userlist\",\"result\": true}");
 			});
 		}
@@ -147,11 +162,11 @@ void sendStatus(AsyncWebSocketClient *client)
 		serializeJson(root, (char *)buffer->get(), len + 1);
 		if (client)
 		{
-			client->text(buffer);
+			ws.text(client, (const char *)buffer->get(), len);
 		}
 		else
 		{
-			ws.textAll(buffer);
+			ws.textAll((const char *)buffer->get(), len);
 		}
 	}
 }
@@ -195,7 +210,7 @@ void printScanResult(int networksFound)
 	if (buffer)
 	{
 		serializeJson(root, (char *)buffer->get(), len + 1);
-		ws.textAll(buffer);
+		ws.textAll((const char *)buffer->get(), len);
 	}
 	WiFi.scanDelete();
 }
@@ -212,11 +227,11 @@ void sendTime(AsyncWebSocketClient *client)
 		serializeJson(root, (char *)buffer->get(), len + 1);
 		if (client)
 		{
-			client->text(buffer);
+			ws.text(client, (const char *)buffer->get(), len);
 		}
 		else
 		{
-			ws.textAll(buffer);
+			ws.textAll((const char *)buffer->get(), len);
 		}
 	}
 }

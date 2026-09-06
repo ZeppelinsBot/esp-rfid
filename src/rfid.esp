@@ -544,7 +544,7 @@ void rfidOutsideMessaging()
 		if (buffer)
 		{
 			serializeJson(root, (char *)buffer->get(), len + 1);
-			ws.textAll(buffer);
+			ws.textAll((const char *)buffer->get(), len);
 		}
 		mqttPublishAccess(epoch, "false", "Denied", "Unknown", uid, " ");
 		ledAccessDeniedOn();
@@ -564,7 +564,7 @@ void rfidOutsideMessaging()
 		if (buffer)
 		{
 			serializeJson(root, (char *)buffer->get(), len + 1);
-			ws.textAll(buffer);
+			ws.textAll((const char *)buffer->get(), len);
 		}
 	}
 }

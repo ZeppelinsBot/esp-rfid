@@ -111,7 +111,7 @@ void sendLogFile(int page, String fileName, int logFileType, AsyncWebSocketClien
 	if (buffer)
 	{
 		serializeJson(root, (char *)buffer->get(), len + 1);
-		client->text(buffer);
+		ws.text(client, (const char *)buffer->get(), len);
 		if (logFileType == LOGTYPE_EVENTLOG)
 			client->text("{\"command\":\"result\",\"resultof\":\"eventlist\",\"result\": true}");
 		if (logFileType == LOGTYPE_LATESTLOG)
@@ -233,7 +233,7 @@ void sendFileList(int page, AsyncWebSocketClient *client)
 		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 		if (buffer) {
 			serializeJson(root, (char *)buffer->get(), len + 1);
-			client->text(buffer);
+			ws.text(client, (const char *)buffer->get(), len);
 			client->text("{\"command\":\"result\",\"resultof\":\"listfiles\",\"result\": true}");
 		}
 		return;
@@ -265,7 +265,7 @@ void sendFileList(int page, AsyncWebSocketClient *client)
 	if (buffer)
 	{
 		serializeJson(root, (char *)buffer->get(), len + 1);
-		client->text(buffer);
+		ws.text(client, (const char *)buffer->get(), len);
 		client->text("{\"command\":\"result\",\"resultof\":\"listfiles\",\"result\": true}");
 	}
 }
