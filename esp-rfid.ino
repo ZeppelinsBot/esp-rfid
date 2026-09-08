@@ -182,11 +182,13 @@ void setup()
 #endif
 
 	Serial.println(F("[BOOT] SPIFFS init"));
-	if (!SPIFFS.begin(true))
+	if (!SPIFFS.begin(false))
 	{
-		if (SPIFFS.format())
+		Serial.println(F("[BOOT] SPIFFS mount failed, attempting format..."));
+		if (SPIFFS.format() && SPIFFS.begin(false))
 		{
 			writeEvent("WARN", "sys", "Filesystem formatted", "");
+			Serial.println(F("[BOOT] SPIFFS formatted and mounted"));
 		}
 		else
 		{
