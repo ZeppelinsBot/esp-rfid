@@ -6,6 +6,8 @@ String type = "";
 String uid = "";
 String v1uid = "";
 String username = "";
+String cardSecret = ""; // Secret read from chip before PICC_HaltA
+enum RfidStates
 {
 	waitingRfid,
 	cardSwiped,
