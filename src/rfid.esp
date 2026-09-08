@@ -635,9 +635,15 @@ void setupWiegandReader(int d0, int d1, bool removeParityBits)
 	rfidState = waitingRfid;
 }
 
+// Custom SPI pins: SCK=GPIO4, MISO=GPIO5, MOSI=GPIO6
+// GPIO8 (blue LED) stays free for relay indicator
+#define MFRC522_SCK  4
+#define MFRC522_MISO 5
+#define MFRC522_MOSI 6
+
 void setupMFRC522Reader(int rfidss, int rfidgain)
 {
-	SPI.begin();						 // MFRC522 Hardware uses SPI protocol
+	SPI.begin(MFRC522_SCK, MFRC522_MISO, MFRC522_MOSI, rfidss);
 	mfrc522.PCD_Init(rfidss, UINT8_MAX); // Initialize MFRC522 Hardware
 	// Set RFID Hardware Antenna Gain
 	// This may not work with some boards
