@@ -45,12 +45,26 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 	while (file)
 	{
 		String fileName = String(file.name());
+		// ESP32 SPIFFS: file.name() may return just the filename
+		// without the /P/ prefix. Check both cases.
+		String uid = "";
 		if (fileName.startsWith("/P/")) {
+			uid = fileName.substring(3);
+		} else if (fileName.startsWith("P/")) {
+			uid = fileName.substring(2);
+		} else {
+			// Skip system files
+			if (fileName == "config.json" || fileName == "eventlog.json" ||
+				fileName == "latestlog.json") {
+				file = rootDir.openNextFile();
+				continue;
+			}
+			uid = fileName;
+		}
+		if (uid.length() > 0) {
 			if (i >= first && i < last)
 			{
 				JsonObject item = users.add<JsonObject>();
-				String uid = fileName;
-				uid.remove(0, 3);
 				item["uid"] = uid;
 				size_t size = file.size();
 				std::unique_ptr<char[]> buf(new char[size]);
