@@ -7,12 +7,6 @@ String uid = "";
 String v1uid = "";
 String username = "";
 String cardSecret = ""; // Secret read from chip before PICC_HaltA
-String cardSecret = ""; // Secret read from chip before PICC_HaltA
-bool wiegandAvailable = false;
-
-#define WIEGAND_ENT 0xD
-#define WIEGAND_ESC 0x1B
-
 enum RfidStates
 {
 	waitingRfid,
