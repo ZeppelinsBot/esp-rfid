@@ -45,8 +45,10 @@ void onWifiGotIP(arduino_event_id_t event)
 #endif
 	wifiReconnectTimerActive = false;
 	ledWifiOn();
-	// Don't call connectToMqtt() here — it blocks the main loop.
-	// The MQTT reconnect timer in loop() handles this safely.
+	// Activate MQTT reconnect timer — connectToMqtt() will run
+	// after the boot delay from the main loop.
+	mqttReconnectTimerStart = millis();
+	mqttReconnectTimerActive = true;
 }
 
 bool startAP(IPAddress apip, IPAddress apsubnet, bool hidden, const char *ssid, const char *password = NULL)
