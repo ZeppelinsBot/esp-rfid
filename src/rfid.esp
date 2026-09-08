@@ -109,6 +109,11 @@ void mfrc522Read()
 	{
 		return;
 	}
+	Serial.printf("[RFID] Card detected: ");
+	for (byte i = 0; i < mfrc522.uid.size; i++) {
+		Serial.printf("%02X", mfrc522.uid.uidByte[i]);
+	}
+	Serial.println();
 	mfrc522.PICC_HaltA();
 	cooldown = millis() + COOLDOWN_MILIS;
 
