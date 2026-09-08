@@ -694,7 +694,9 @@ function isVisible(e) {
 
 function listSCAN(obj) {
   var elm = document.getElementById("usersbanner");
-  if (isVisible(elm)) {
+  // On ESP32, isVisible() may fail with dynamically loaded content.
+  // Just check if the element exists (user is on Users tab).
+  if (elm) {
     if (obj.known === 1) {
       $(".fooicon-remove").click();
       document.querySelector("input.form-control[type=text]").value = obj.uid;
