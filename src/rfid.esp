@@ -334,13 +334,16 @@ int weekdayFromMonday(int weekdayFromSunday) {
  */
 void rfidProcess()
 {
+	Serial.printf("[RFID] rfidProcess: state=%d picCodeReq=%d\n", rfidState, config.pinCodeRequested);
 	if (rfidState == waitingRfid ||
 			(config.pinCodeRequested && rfidState == cardSwiped))
 	{
+		Serial.println(F("[RFID] rfidProcess: early return"));
 		return;
 	}
 
 	/* Each user has a file named after the RFID UID */
+	Serial.printf("[RFID] Opening /P/%s\n", uid.c_str());
 	File f = SPIFFS.open("/P/" + uid, "r");
 
 	/*
