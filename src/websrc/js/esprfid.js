@@ -694,19 +694,22 @@ function isVisible(e) {
 
 function listSCAN(obj) {
   var elm = document.getElementById("usersbanner");
-  // On ESP32, isVisible() may fail with dynamically loaded content.
-  // Just check if the element exists (user is on Users tab).
   if (elm) {
     if (obj.known === 1) {
       $(".fooicon-remove").click();
       document.querySelector("input.form-control[type=text]").value = obj.uid;
       $(".fooicon-search").click();
     } else {
-      $(".footable-add").click();
-      document.getElementById("uid").value = obj.uid;
-      document.getElementById("picctype").value = obj.type;
-      document.getElementById("username").value = obj.user;
-      document.getElementById("acctype").value = obj.acctype;
+      // Directly open the editor modal instead of clicking footable-add
+      // (footable-add button may not exist or have wrong selector on ESP32)
+      var modal = document.getElementById("editor-modal");
+      var form = document.getElementById("editor");
+      if (modal && form) {
+        form.reset();
+        document.getElementById("uid").value = obj.uid;
+        document.getElementById("picctype").value = obj.type;
+        $(modal).modal("show");
+      }
     }
   }
 }
