@@ -108,6 +108,107 @@ MFRC522::MIFARE_Key defaultKey = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
 #define SECRET_KEY_LEN 16
 
 /*
+ * Reset a MIFARE Classic sector trailer back to factory defaults.
+ * Tries to authenticate to the sector trailer with the default key.
+ * If successful, restores default Key A, access bits, and Key B.
+ * Returns true on success.
+ */
+bool formatMifareSector() {
+	Serial.println(F("[FORMAT] Waiting for card..."));
+	unsigned long start = millis();
+	while (millis() - start < 10000) {
+		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+			break;
+		}
+		delay(50);
+	}
+	if (!mfrc522.uid.size) {
+		Serial.println(F("[FORMAT] Timeout — no card found"));
+		return false;
+	}
+
+	// Set global uid
+	uid = "";
+	for (byte i = 0; i < mfrc522.uid.size; i++) {
+		if (mfrc522.uid.uidByte[i] < 0x10) uid += "0";
+		uid += String(mfrc522.uid.uidByte[i], HEX);
+	}
+	uid.toLowerCase();
+	Serial.printf("[FORMAT] Card UID: %s\n", uid.c_str());
+	delay(100);
+
+	// Sector trailer = last block of the sector
+	// Sector 0: blocks 0-3, trailer = block 3
+	// Sector 1: blocks 4-7, trailer = block 7
+	// Sector 2: blocks 8-11, trailer = block 11
+	const int SECTOR_TRAILER = SECRET_BLOCK + (3 - (SECRET_BLOCK % 4)); // block 7 for sector 1
+
+	// Try to authenticate to the sector trailer with default Key A
+	MFRC522::MIFARE_Key key;
+	memcpy(key.keyByte, defaultKey.keyByte, 6);
+	MFRC522::StatusCode status;
+	for (int attempt = 0; attempt < 3; attempt++) {
+		status = mfrc522.PCD_Authenticate(
+			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECTOR_TRAILER, &key, &(mfrc522.uid));
+		if (status == MFRC522::STATUS_OK) break;
+		Serial.printf("[FORMAT] Trailer auth attempt %d failed: %d\n", attempt + 1, status);
+		if (attempt < 2) {
+			mfrc522.PICC_HaltA();
+			mfrc522.PCD_StopCrypto1();
+			delay(200);
+			if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+				delay(100);
+			}
+		}
+	}
+	if (status != MFRC522::STATUS_OK) {
+		Serial.printf("[FORMAT] Cannot authenticate to sector trailer — card is locked\n");
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+	Serial.println(F("[FORMAT] Trailer auth OK, restoring defaults..."));
+
+	// Default MIFARE Classic sector trailer:
+	// Key A: FF FF FF FF FF FF
+	// Access bits: FF 07 80 69 (factory default)
+	// Key B: FF FF FF FF FF FF
+	byte trailerData[16] = {
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // Key A
+		0xFF, 0x07, 0x80, 0x69,               // Access bits
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Key B
+	};
+
+	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerData, 16);
+	if (status != MFRC522::STATUS_OK) {
+		Serial.printf("[FORMAT] Write trailer failed: %d\n", status);
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+
+	// Verify: try to authenticate to the data block with default key
+	mfrc522.PICC_HaltA();
+	mfrc522.PCD_StopCrypto1();
+	delay(100);
+	if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+		delay(100);
+		memcpy(key.keyByte, defaultKey.keyByte, 6);
+		status = mfrc522.PCD_Authenticate(
+			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
+		if (status == MFRC522::STATUS_OK) {
+			Serial.println(F("[FORMAT] Success! Sector restored to factory defaults."));
+		} else {
+			Serial.printf("[FORMAT] Verify auth failed: %d (trailer was written but data block still inaccessible)\n", status);
+		}
+	}
+
+	mfrc522.PICC_HaltA();
+	mfrc522.PCD_StopCrypto1();
+	return true;
+}
+
+/*
  * Enroll a MIFARE Classic 1K chip by writing a random secret to Sector 1, Block 4.
  * The secret is then stored in the user JSON for later verification.
  * Returns true on success.

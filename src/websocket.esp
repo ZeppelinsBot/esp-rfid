@@ -217,6 +217,15 @@ void processWsMessage(WsMessage *incomingMessage)
 			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false}");
 		}
 	}
+	else if (strcmp(command, "formatcard") == 0)
+	{
+		bool success = formatMifareSector();
+		if (success) {
+			client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":true}");
+		} else {
+			client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":false}");
+		}
+	}
 	else if (strcmp(command, "testrelay1") == 0)
 	{
 		activateRelay[0] = true;
