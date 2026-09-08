@@ -158,8 +158,28 @@ void processWsMessage(WsMessage *incomingMessage)
 		const char *uid = root["uid"];
 		String filename = "/P/";
 		filename += uid;
+		// Preserve secret from previous enrollment if not in new data
+		String existingSecret = "";
+		File fExisting = SPIFFS.open(filename, "r");
+		if (fExisting)
+		{
+			size_t sz = fExisting.size();
+			std::unique_ptr<char[]> buf(new char[sz]);
+			fExisting.readBytes(buf.get(), sz);
+			fExisting.close();
+			JsonDocument existingDoc;
+			deserializeJson(existingDoc, buf.get(), sz);
+			if (!existingDoc["secret"].isNull())
+			{
+				existingSecret = existingDoc["secret"].as<String>();
+			}
+		}
+		// Preserve secret if not in new data
+		if (existingSecret.length() > 0 && root["secret"].isNull())
+		{
+			root["secret"] = existingSecret;
+		}
 		File f = SPIFFS.open(filename, "w+");
-		// Check if we created the file
 		if (f)
 		{
 			serializeJson(root, f);

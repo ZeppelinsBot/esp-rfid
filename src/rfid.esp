@@ -6,6 +6,8 @@ String type = "";
 String uid = "";
 String v1uid = "";
 String username = "";
+String cardSecret = ""; // Secret read from chip before PICC_HaltA
+String cardSecret = ""; // Secret read from chip before PICC_HaltA
 bool wiegandAvailable = false;
 
 #define WIEGAND_ENT 0xD
@@ -195,45 +197,17 @@ bool verifyMifareClassic(const String &storedSecret) {
 		return true;
 	}
 
-	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+	// Use the secret already read in mfrc522Read() before PICC_HaltA
+	if (cardSecret.length() == 0) {
+		Serial.println(F("[VERIFY] No card secret available"));
 		return false;
 	}
-
-	// Authenticate to Sector 1 with default Key A
-	MFRC522::MIFARE_Key key;
-	memcpy(key.keyByte, defaultKey.keyByte, 6);
-	MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
-		MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
-	if (status != MFRC522::STATUS_OK) {
-		mfrc522.PICC_HaltA();
-		mfrc522.PCD_StopCrypto1();
-		return false;
-	}
-
-	// Read secret from Block 4
-	byte readBuf[18];
-	byte readSize = 18;
-	status = mfrc522.MIFARE_Read(SECRET_BLOCK, readBuf, &readSize);
-	mfrc522.PICC_HaltA();
-	mfrc522.PCD_StopCrypto1();
-
-	if (status != MFRC522::STATUS_OK) {
-		return false;
-	}
-
-	// Convert card's secret to hex string and compare
-	String cardSecret = "";
-	for (int i = 0; i < SECRET_KEY_LEN; i++) {
-		if (readBuf[i] < 0x10) cardSecret += "0";
-		cardSecret += String(readBuf[i], HEX);
-	}
-	cardSecret.toUpperCase();
 
 	if (cardSecret == storedSecret) {
 		Serial.println(F("[VERIFY] Secret matches — genuine chip"));
 		return true;
 	} else {
-		Serial.println(F("[VERIFY] Secret MISMATCH — cloned/invalid chip"));
+		Serial.printf("[VERIFY] Secret MISMATCH: card=%s stored=%s\n", cardSecret.c_str(), storedSecret.c_str());
 		return false;
 	}
 }
@@ -249,6 +223,26 @@ void mfrc522Read()
 		Serial.printf("%02X", mfrc522.uid.uidByte[i]);
 	}
 	Serial.println();
+	cardSecret = "";
+	// Read secret from Sector 1 BEFORE PICC_HaltA puts card to sleep
+	{
+		MFRC522::MIFARE_Key key;
+		memcpy(key.keyByte, defaultKey.keyByte, 6);
+		MFRC522::StatusCode st = mfrc522.PCD_Authenticate(
+			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
+		if (st == MFRC522::STATUS_OK) {
+			byte readBuf[18];
+			byte readSize = 18;
+			st = mfrc522.MIFARE_Read(SECRET_BLOCK, readBuf, &readSize);
+			if (st == MFRC522::STATUS_OK) {
+				for (int i = 0; i < SECRET_KEY_LEN; i++) {
+					if (readBuf[i] < 0x10) cardSecret += "0";
+					cardSecret += String(readBuf[i], HEX);
+				}
+				cardSecret.toUpperCase();
+			}
+		}
+	}
 	mfrc522.PICC_HaltA();
 	cooldown = millis() + COOLDOWN_MILIS;
 
