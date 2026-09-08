@@ -1,5 +1,47 @@
 void extern mqttPublishEvent(JsonDocument *root);
 
+#define MIN_SPIFF_FREE 10240 // 10KB minimum free space
+
+void trimLogFile(const char *filename, int keepPercent) {
+	File f = SPIFFS.open(filename, "r");
+	if (!f) return;
+	size_t totalSize = f.size();
+	if (totalSize == 0) { f.close(); return; }
+
+	// Read all lines into a buffer
+	std::vector<String> lines;
+	String line;
+	while (f.available()) {
+		line = f.readStringUntil('\n');
+		if (line.length() > 0) lines.push_back(line);
+	}
+	f.close();
+
+	if (lines.size() < 3) return; // too few lines to trim
+
+	// Keep only the last keepPercent% of lines
+	int keepCount = (lines.size() * keepPercent) / 100;
+	if (keepCount < 1) keepCount = 1;
+	int skipCount = lines.size() - keepCount;
+
+	// Rewrite file with kept lines
+	f = SPIFFS.open(filename, "w");
+	if (!f) return;
+	for (int i = skipCount; i < (int)lines.size(); i++) {
+		f.println(lines[i]);
+	}
+	f.close();
+	Serial.printf("[INFO] Trimmed %s: %d -> %d lines\n", filename, (int)lines.size(), keepCount);
+}
+
+void ensureLogSpace(const char *filename) {
+	size_t freeBytes = SPIFFS.totalBytes() - SPIFFS.usedBytes();
+	if (freeBytes < MIN_SPIFF_FREE) {
+		Serial.printf("[WARN] Low SPIFFS: %u bytes free, trimming %s\n", (unsigned)freeBytes, filename);
+		trimLogFile(filename, 50); // keep last 50%
+	}
+}
+
 void writeEvent(String type, String src, String desc, String data)
 {
 	JsonDocument root;
@@ -16,6 +58,7 @@ void writeEvent(String type, String src, String desc, String data)
 	}
 	else // log to file
 	{
+		ensureLogSpace("/eventlog.json");
 		File eventlog = SPIFFS.open("/eventlog.json", "a");
 		serializeJson(root, eventlog);
 		eventlog.print("\n");
@@ -34,6 +77,7 @@ void writeLatest(String uid, String username, int acctype, int access = ACCESS_G
 	root["acctype"] = acctype;
 	root["access"] = access;
 	root["timestamp"] = epoch;
+	ensureLogSpace("/latestlog.json");
 	File latestlog = SPIFFS.open("/latestlog.json", "a");
 	serializeJson(root, latestlog);
 	latestlog.print("\n");
