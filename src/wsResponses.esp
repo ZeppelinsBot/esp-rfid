@@ -23,9 +23,9 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 	int last = page * 10;
 	int i = 0;
 
-	// ESP32 SPIFFS directory iteration
-	File rootDir = SPIFFS.open("/P/");
-	if (!rootDir || !rootDir.isDirectory()) {
+	// ESP32 SPIFFS: no real directories — iterate root and filter by /P/ prefix
+	File rootDir = SPIFFS.open("/");
+	if (!rootDir) {
 		root["haspages"] = 0;
 		size_t len = measureJson(root);
 		AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
