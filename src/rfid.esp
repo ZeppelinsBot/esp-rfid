@@ -141,7 +141,7 @@ bool enrollMifareClassic(String &outSecret) {
 	}
 
 	// Write secret to Block 4
-	status = mfrc522.MIFARE_Write((byte*)SECRET_BLOCK, secretBuf, SECRET_KEY_LEN);
+	status = mfrc522.MIFARE_Write(SECRET_BLOCK, secretBuf, SECRET_KEY_LEN);
 	if (status != MFRC522::STATUS_OK) {
 		Serial.printf("[ENROLL] Write failed: %d\n", status);
 		mfrc522.PICC_HaltA();
