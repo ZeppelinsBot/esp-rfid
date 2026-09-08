@@ -196,7 +196,7 @@ void processWsMessage(WsMessage *incomingMessage)
 		String sectorKey = "";
 		bool success = enrollMifareClassic(secret, sectorKey);
 		if (success) {
-			// Save secret + sectorKey to user JSON
+			// Save secret to user JSON (sectorKey is fixed in firmware, no need to store per-card)
 			String filename = "/P/" + String(uid);
 			File f = SPIFFS.open(filename, "r");
 			if (f) {
@@ -207,14 +207,13 @@ void processWsMessage(WsMessage *incomingMessage)
 				JsonDocument json;
 				deserializeJson(json, buf.get(), size);
 				json["secret"] = secret;
-				if (sectorKey.length() > 0) json["sectorKey"] = sectorKey;
 				File f2 = SPIFFS.open(filename, "w");
 				if (f2) {
 					serializeJson(json, f2);
 					f2.close();
 				}
 			}
-			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":true,\"secret\":\"" + secret + "\",\"sectorKey\":\"" + sectorKey + "\"}");
+			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":true,\"secret\":\"" + secret + "\"}");
 		} else {
 			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false}");
 		}

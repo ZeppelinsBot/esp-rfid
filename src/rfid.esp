@@ -174,9 +174,9 @@ bool formatMifareSector() {
 	// Access bits: FF 07 80 69 (factory default)
 	// Key B: FF FF FF FF FF FF
 	byte trailerData[16] = {
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // Key A
+		0x4B, 0x7E, 0xA3, 0x9D, 0x1F, 0x58,  // Key A (SECTOR_MASTER_KEY)
 		0xFF, 0x07, 0x80, 0x69,               // Access bits
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Key B
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Key B (default, for NFC tool compat)
 	};
 
 	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerData, 16);
@@ -187,19 +187,20 @@ bool formatMifareSector() {
 		return false;
 	}
 
-	// Verify: try to authenticate to the data block with default key
+	// Verify: try to authenticate with master key
 	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
 	delay(100);
 	if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
 		delay(100);
-		memcpy(key.keyByte, defaultKey.keyByte, 6);
+		byte verifyBytes[6] = SECTOR_MASTER_KEY;
+		memcpy(key.keyByte, verifyBytes, 6);
 		status = mfrc522.PCD_Authenticate(
 			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
 		if (status == MFRC522::STATUS_OK) {
-			Serial.println(F("[FORMAT] Success! Sector restored to factory defaults."));
+			Serial.println(F("[FORMAT] Success! Sector restored with master key."));
 		} else {
-			Serial.printf("[FORMAT] Verify auth failed: %d (trailer was written but data block still inaccessible)\n", status);
+			Serial.printf("[FORMAT] Verify auth failed: %d\n", status);
 		}
 	}
 
@@ -329,11 +330,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 		return true; // secret is on the card, just not protected
 	}
 
-	// Generate random 6-byte sector key
-	byte sectorKeyBuf[6];
-	for (int i = 0; i < 6; i++) {
-		sectorKeyBuf[i] = esp_random() & 0xFF;
-	}
+	// Use fixed master sector key (defined in magicnumbers.h)
+	byte sectorKeyBuf[6] = SECTOR_MASTER_KEY;
 
 	// Replace Key A (first 6 bytes of trailer) with our custom key
 	memcpy(trailerBuf, sectorKeyBuf, 6);
@@ -400,41 +398,10 @@ void mfrc522Read()
 	}
 	Serial.println();
 	cardSecret = "";
-	// Build UID string first so we can look up the user file
-	String readUid = "";
-	for (byte i = 0; i < mfrc522.uid.size; i++) {
-		if (mfrc522.uid.uidByte[i] < 0x10) readUid += "0";
-		readUid += String(mfrc522.uid.uidByte[i], HEX);
-	}
-	readUid.toLowerCase();
-
-	// Try to load stored sector key from user file
+	// Use master sector key to read the secret
 	MFRC522::MIFARE_Key key;
-	bool hasSectorKey = false;
-	String filename = "/P/" + readUid;
-	File f = SPIFFS.open(filename, "r");
-	if (f) {
-		size_t sz = f.size();
-		std::unique_ptr<char[]> buf(new char[sz]);
-		f.readBytes(buf.get(), sz);
-		f.close();
-		JsonDocument json;
-		deserializeJson(json, buf.get(), sz);
-		String storedSectorKey = json["sectorKey"].as<String>();
-		if (storedSectorKey.length() == 12) {
-			// Convert hex string to6-byte key
-			for (int i = 0; i < 6; i++) {
-				char hex[3] = { storedSectorKey[i*2], storedSectorKey[i*2+1], 0 };
-				key.keyByte[i] = (byte)strtol(hex, NULL, 16);
-			}
-			hasSectorKey = true;
-			Serial.printf("[RFID] Using stored sector key\n");
-		}
-	}
-	if (!hasSectorKey) {
-		memcpy(key.keyByte, defaultKey.keyByte, 6);
-		Serial.printf("[RFID] Using default sector key\n");
-	}
+	byte masterBytes[6] = SECTOR_MASTER_KEY;
+	memcpy(key.keyByte, masterBytes, 6);
 
 	// Read secret from Sector 1 BEFORE PICC_HaltA puts card to sleep
 	{
@@ -450,6 +417,23 @@ void mfrc522Read()
 					cardSecret += String(readBuf[i], HEX);
 				}
 				cardSecret.toUpperCase();
+			}
+		} else {
+			// Fallback: try default key for legacy cards (enrolled before sector key was changed)
+			memcpy(key.keyByte, defaultKey.keyByte, 6);
+			st = mfrc522.PCD_Authenticate(
+				MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
+			if (st == MFRC522::STATUS_OK) {
+				byte readBuf[18];
+				byte readSize = 18;
+				st = mfrc522.MIFARE_Read(SECRET_BLOCK, readBuf, &readSize);
+				if (st == MFRC522::STATUS_OK) {
+					for (int i = 0; i < SECRET_KEY_LEN; i++) {
+						if (readBuf[i] < 0x10) cardSecret += "0";
+						cardSecret += String(readBuf[i], HEX);
+					}
+					cardSecret.toUpperCase();
+				}
 			}
 		}
 	}
