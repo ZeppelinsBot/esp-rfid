@@ -213,7 +213,7 @@ bool formatMifareSector() {
  * The secret is then stored in the user JSON for later verification.
  * Returns true on success.
  */
-bool enrollMifareClassic(String &outSecret) {
+bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	// Wait for card to be presented (user must remove + re-present after scan)
 	Serial.println(F("[ENROLL] Waiting for card..."));
 	unsigned long start = millis();
@@ -307,7 +307,7 @@ bool enrollMifareClassic(String &outSecret) {
 		return false;
 	}
 
-	// Convert to hex string
+	// Convert secret to hex string
 	outSecret = "";
 	for (int i = 0; i < SECRET_KEY_LEN; i++) {
 		if (secretBuf[i] < 0x10) outSecret += "0";
@@ -315,10 +315,49 @@ bool enrollMifareClassic(String &outSecret) {
 	}
 	outSecret.toUpperCase();
 
+	// --- Change Key A on sector trailer so nobody can read the secret with default key ---
+	const int SECTOR_TRAILER = SECRET_BLOCK + (3 - (SECRET_BLOCK % 4)); // Block 7 for Sector 1
+
+	// Read current sector trailer
+	byte trailerBuf[18];
+	byte trailerSize = 18;
+	status = mfrc522.MIFARE_Read(SECTOR_TRAILER, trailerBuf, &trailerSize);
+	if (status != MFRC522::STATUS_OK) {
+		Serial.printf("[ENROLL] Read trailer failed: %d — secret written but sector key NOT changed\n", status);
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return true; // secret is on the card, just not protected
+	}
+
+	// Generate random 6-byte sector key
+	byte sectorKeyBuf[6];
+	for (int i = 0; i < 6; i++) {
+		sectorKeyBuf[i] = esp_random() & 0xFF;
+	}
+
+	// Replace Key A (first 6 bytes of trailer) with our custom key
+	memcpy(trailerBuf, sectorKeyBuf, 6);
+
+	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerBuf, 16);
+	if (status != MFRC522::STATUS_OK) {
+		Serial.printf("[ENROLL] Write trailer failed: %d — secret written but sector key NOT changed\n", status);
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return true; // secret is on the card, just not protected
+	}
+
+	// Convert sector key to hex string
+	outSectorKey = "";
+	for (int i = 0; i < 6; i++) {
+		if (sectorKeyBuf[i] < 0x10) outSectorKey += "0";
+		outSectorKey += String(sectorKeyBuf[i], HEX);
+	}
+	outSectorKey.toUpperCase();
+
 	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
 
-	Serial.printf("[ENROLL] Success! Secret: %s\n", outSecret.c_str());
+	Serial.printf("[ENROLL] Success! Secret: %s SectorKey: %s\n", outSecret.c_str(), outSectorKey.c_str());
 	return true;
 }
 
@@ -361,10 +400,44 @@ void mfrc522Read()
 	}
 	Serial.println();
 	cardSecret = "";
+	// Build UID string first so we can look up the user file
+	String readUid = "";
+	for (byte i = 0; i < mfrc522.uid.size; i++) {
+		if (mfrc522.uid.uidByte[i] < 0x10) readUid += "0";
+		readUid += String(mfrc522.uid.uidByte[i], HEX);
+	}
+	readUid.toLowerCase();
+
+	// Try to load stored sector key from user file
+	MFRC522::MIFARE_Key key;
+	bool hasSectorKey = false;
+	String filename = "/P/" + readUid;
+	File f = SPIFFS.open(filename, "r");
+	if (f) {
+		size_t sz = f.size();
+		std::unique_ptr<char[]> buf(new char[sz]);
+		f.readBytes(buf.get(), sz);
+		f.close();
+		JsonDocument json;
+		deserializeJson(json, buf.get(), sz);
+		String storedSectorKey = json["sectorKey"].as<String>();
+		if (storedSectorKey.length() == 12) {
+			// Convert hex string to6-byte key
+			for (int i = 0; i < 6; i++) {
+				char hex[3] = { storedSectorKey[i*2], storedSectorKey[i*2+1], 0 };
+				key.keyByte[i] = (byte)strtol(hex, NULL, 16);
+			}
+			hasSectorKey = true;
+			Serial.printf("[RFID] Using stored sector key\n");
+		}
+	}
+	if (!hasSectorKey) {
+		memcpy(key.keyByte, defaultKey.keyByte, 6);
+		Serial.printf("[RFID] Using default sector key\n");
+	}
+
 	// Read secret from Sector 1 BEFORE PICC_HaltA puts card to sleep
 	{
-		MFRC522::MIFARE_Key key;
-		memcpy(key.keyByte, defaultKey.keyByte, 6);
 		MFRC522::StatusCode st = mfrc522.PCD_Authenticate(
 			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
 		if (st == MFRC522::STATUS_OK) {
