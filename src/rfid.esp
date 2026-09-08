@@ -103,6 +103,133 @@ void wiegandRead()
 	}
 }
 
+MFRC522::MIFARE_Key defaultKey = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
+
+// Sector 1, Block 4 — where we store the secret key
+#define SECRET_SECTOR 1
+#define SECRET_BLOCK  4
+#define SECRET_KEY_LEN 16
+
+/*
+ * Enroll a MIFARE Classic 1K chip by writing a random secret to Sector 1, Block 4.
+ * The secret is then stored in the user JSON for later verification.
+ * Returns true on success.
+ */
+bool enrollMifareClassic(String &outSecret) {
+	// Re-detect the card (PICC_HaltA was called after mfrc522Read)
+	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+		Serial.println(F("[ENROLL] No card found for enrollment"));
+		return false;
+	}
+
+	// Authenticate to Sector 1 with default Key A
+	MFRC522::MIFARE_Key key;
+	memcpy(key.keyByte, defaultKey.keyByte, 6);
+	MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
+		MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
+	if (status != MFRC522::STATUS_OK) {
+		Serial.printf("[ENROLL] Auth failed: %d\n", status);
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+
+	// Generate random 16-byte secret
+	byte secretBuf[SECRET_KEY_LEN];
+	for (int i = 0; i < SECRET_KEY_LEN; i++) {
+		secretBuf[i] = esp_random() & 0xFF;
+	}
+
+	// Write secret to Block 4
+	status = mfrc522.MIFARE_Write((byte*)SECRET_BLOCK, secretBuf, SECRET_KEY_LEN);
+	if (status != MFRC522::STATUS_OK) {
+		Serial.printf("[ENROLL] Write failed: %d\n", status);
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+
+	// Verify by reading back
+	byte readBuf[18];
+	byte readSize = 18;
+	status = mfrc522.MIFARE_Read(SECRET_BLOCK, readBuf, &readSize);
+	if (status != MFRC522::STATUS_OK || memcmp(readBuf, secretBuf, SECRET_KEY_LEN) != 0) {
+		Serial.println(F("[ENROLL] Verify failed"));
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+
+	// Convert to hex string
+	outSecret = "";
+	for (int i = 0; i < SECRET_KEY_LEN; i++) {
+		if (secretBuf[i] < 0x10) outSecret += "0";
+		outSecret += String(secretBuf[i], HEX);
+	}
+	outSecret.toUpperCase();
+
+	mfrc522.PICC_HaltA();
+	mfrc522.PCD_StopCrypto1();
+
+	Serial.printf("[ENROLL] Success! Secret: %s\n", outSecret.c_str());
+	return true;
+}
+
+/*
+ * Verify a MIFARE Classic 1K chip by reading the secret from Sector 1, Block 4
+ * and comparing it with the stored secret from the user JSON.
+ * Returns true if the chip is genuine (secret matches).
+ * Returns false if chip is cloned, empty, or not MIFARE Classic.
+ */
+bool verifyMifareClassic(const String &storedSecret) {
+	if (storedSecret.length() == 0) {
+		// No secret stored — legacy UID-only mode, skip verification
+		return true;
+	}
+
+	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+		return false;
+	}
+
+	// Authenticate to Sector 1 with default Key A
+	MFRC522::MIFARE_Key key;
+	memcpy(key.keyByte, defaultKey.keyByte, 6);
+	MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
+		MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
+	if (status != MFRC522::STATUS_OK) {
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+
+	// Read secret from Block 4
+	byte readBuf[18];
+	byte readSize = 18;
+	status = mfrc522.MIFARE_Read(SECRET_BLOCK, readBuf, &readSize);
+	mfrc522.PICC_HaltA();
+	mfrc522.PCD_StopCrypto1();
+
+	if (status != MFRC522::STATUS_OK) {
+		return false;
+	}
+
+	// Convert card's secret to hex string and compare
+	String cardSecret = "";
+	for (int i = 0; i < SECRET_KEY_LEN; i++) {
+		if (readBuf[i] < 0x10) cardSecret += "0";
+		cardSecret += String(readBuf[i], HEX);
+	}
+	cardSecret.toUpperCase();
+
+	if (cardSecret == storedSecret) {
+		Serial.println(F("[VERIFY] Secret matches — genuine chip"));
+		return true;
+	} else {
+		Serial.println(F("[VERIFY] Secret MISMATCH — cloned/invalid chip"));
+		return false;
+	}
+}
+
 void mfrc522Read()
 {
 	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())
@@ -400,6 +527,15 @@ void rfidProcess()
 #ifdef DEBUG
 		Serial.println("Wrong pin code");
 #endif
+		return;
+	}
+
+	// Secret Key verification — reject cloned chips
+	String storedSecret = json["secret"].as<String>();
+	if (!verifyMifareClassic(storedSecret))
+	{
+		processingState = notValid;
+		Serial.println(F("[RFID] Secret verification FAILED — cloned chip?"));
 		return;
 	}
 
