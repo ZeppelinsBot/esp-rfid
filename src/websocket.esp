@@ -170,6 +170,16 @@ void processWsMessage(WsMessage *incomingMessage)
 		f.close();
 		client->text("{\"command\":\"result\",\"resultof\":\"userfile\",\"result\": true}");
 	}
+	else if (strcmp(command, "enroll") == 0)
+	{
+		String secret = "";
+		bool success = enrollMifareClassic(secret);
+		if (success) {
+			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":true,\"secret\":\"" + secret + "\"}");
+		} else {
+			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false}");
+		}
+	}
 	else if (strcmp(command, "testrelay1") == 0)
 	{
 		activateRelay[0] = true;

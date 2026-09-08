@@ -2131,3 +2131,15 @@ function start() {
 
 document.addEventListener("touchstart", handleTouchStart, false);
 document.addEventListener("touchmove", handleTouchMove, false);
+
+function enrollChip() {
+  var uid = document.getElementById("uid").value;
+  if (!uid) {
+    alert("Please scan a card first (UID is empty)");
+    return;
+  }
+  if (!confirm("Place the card on the reader now to enroll. The card will be written with a secret key.")) {
+    return;
+  }
+  sendWebsocket(JSON.stringify({"command": "enroll"}));
+}
