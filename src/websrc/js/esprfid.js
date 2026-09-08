@@ -256,14 +256,14 @@ function revcommit() {
 }
 
 function uncommited() {
+  $("#commit").off("click").on("click", function() {
+    revcommit();
+    return false;
+  });
   $("#commit").fadeOut(200, function() {
     $(this).css("background", "gold").fadeIn(1000);
   });
   document.getElementById("commit").innerHTML = "<h6>You have uncommited changes, please click here to review and commit.</h6>";
-  $("#commit").click(function() {
-    revcommit();
-    return false;
-  });
 }
 
 function savehardware() {
@@ -1546,7 +1546,16 @@ function socketMessageListener(evt) {
         listSSID(obj);
         break;
       case "configfile":
+        // Merge received config into the default config so that any missing
+        // sections (hardware, network, ...) are filled with sane defaults
+        // instead of being undefined which crashes the UI.
+        var defaultConfig = JSON.parse(JSON.stringify(config));
         config = obj;
+        if (!config.network) config.network = defaultConfig.network;
+        if (!config.hardware) config.hardware = defaultConfig.hardware;
+        if (!config.general) config.general = defaultConfig.general;
+        if (!config.mqtt) config.mqtt = defaultConfig.mqtt;
+        if (!config.ntp) config.ntp = defaultConfig.ntp;
         if (!('wifipin' in config.hardware)) config.hardware.wifipin = 255;
         if (!('doorstatpin' in config.hardware)) config.hardware.doorstatpin = 255;
         if (!('maxOpenDoorTime' in config.hardware)) config.hardware.maxOpenDoorTime = 0;

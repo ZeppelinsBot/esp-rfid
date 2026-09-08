@@ -212,14 +212,57 @@ void processWsMessage(WsMessage *incomingMessage)
 	else if (strcmp(command, "getconf") == 0)
 	{
 		File configFile = SPIFFS.open("/config.json", "r");
-		if (configFile)
+		if (configFile && configFile.size() > 2)
 		{
-			// Read file into JsonDocument, add command key so the JS
-			// socketMessageListener matches the "configfile" case.
 			JsonDocument doc;
 			deserializeJson(doc, configFile);
 			configFile.close();
 			doc["command"] = "configfile";
+			// Ensure required sections exist so the JS UI doesn't crash.
+			if (doc["network"].isNull()) doc["network"] = JsonDocument();
+			if (doc["hardware"].isNull()) doc["hardware"] = JsonDocument();
+			if (doc["general"].isNull())  doc["general"]  = JsonDocument();
+			if (doc["ntp"].isNull())      doc["ntp"]      = JsonDocument();
+			if (doc["mqtt"].isNull())     doc["mqtt"]     = JsonDocument();
+			size_t len = measureJson(doc);
+			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
+			if (buffer)
+			{
+				serializeJson(doc, (char *)buffer->get(), len + 1);
+				client->text((const char *)buffer->get(), len);
+			}
+		}
+		else
+		{
+			if (configFile) configFile.close();
+			// No valid config file — send a minimal default so the
+			// JS UI can still show the settings pages.
+			JsonDocument doc;
+			doc["command"]  = "configfile";
+			doc["network"]["ssid"]  = "";
+			doc["network"]["pswd"]  = "";
+			doc["network"]["wmode"] = 1;
+			doc["network"]["dhcp"]  = 1;
+			doc["network"]["apip"]  = "192.168.4.1";
+			doc["network"]["apsubnet"] = "255.255.255.0";
+			doc["hardware"]["readertype"]  = 1;
+			doc["hardware"]["wgd0pin"]     = 4;
+			doc["hardware"]["wgd1pin"]     = 5;
+			doc["hardware"]["sspin"]       = 0;
+			doc["hardware"]["rfidgain"]    = 32;
+			doc["hardware"]["rpin"]        = 4;
+			doc["hardware"]["rtype"]       = 1;
+			doc["hardware"]["ltype"]       = 0;
+			doc["hardware"]["rtime"]       = 400;
+			doc["hardware"]["numrelays"]   = 1;
+			doc["hardware"]["wifipin"]     = 255;
+			doc["general"]["hostnm"]  = "esp-rfid";
+			doc["general"]["pswd"]    = "admin";
+			doc["general"]["restart"] = 0;
+			doc["ntp"]["server"]   = "pool.ntp.org";
+			doc["ntp"]["interval"] = 30;
+			doc["ntp"]["tzinfo"]   = "";
+			doc["mqtt"]["enabled"] = 0;
 			size_t len = measureJson(doc);
 			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 			if (buffer)
