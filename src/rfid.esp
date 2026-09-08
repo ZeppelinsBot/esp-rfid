@@ -342,8 +342,11 @@ void rfidProcess()
 	Serial.printf("[RFID] Processing: state=%d uid=%s\n", rfidState, uid.c_str());
 
 	/* Each user has a file named after the RFID UID */
-	Serial.printf("[RFID] Opening /P/%s...\n", uid.c_str());
-	File f = SPIFFS.open("/P/" + uid, "r");
+	String filename = "/P/" + uid;
+	Serial.printf("[RFID] Checking %s exists...\n", filename.c_str());
+	bool exists = SPIFFS.exists(filename);
+	Serial.printf("[RFID] exists=%d\n", exists);
+	File f = SPIFFS.open(filename, "r");
 	Serial.println(f ? F("[RFID] File opened OK") : F("[RFID] File NOT found"));
 
 	/*
