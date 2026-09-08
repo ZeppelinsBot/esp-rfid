@@ -763,7 +763,8 @@ function listStats() {
   document.getElementById("cpu").innerHTML = ajaxobj.cpu + " Mhz";
   document.getElementById("uptime").innerHTML = ajaxobj.uptime;
   document.getElementById("heap").innerHTML = ajaxobj.heap + " Bytes";
-  document.getElementById("heap").style.width = (ajaxobj.heap * 100) / 40960 + "%";
+  var totalHeap = ajaxobj.totalheap || 40960;
+  document.getElementById("heap").style.width = (ajaxobj.heap * 100) / totalHeap + "%";
   colorStatusbar(document.getElementById("heap"));
   document.getElementById("flash").innerHTML = ajaxobj.availsize + " Bytes";
   document.getElementById("flash").style.width = (ajaxobj.availsize * 100) / (ajaxobj.availsize + ajaxobj.sketchsize) + "%";

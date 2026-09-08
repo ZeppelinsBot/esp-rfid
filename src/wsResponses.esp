@@ -120,6 +120,7 @@ void sendStatus(AsyncWebSocketClient *client)
 	JsonDocument root;
 	root["command"] = "status";
 	root["heap"] = ESP.getFreeHeap();
+	root["totalheap"] = ESP.getHeapSize();
 	root["chipid"] = WiFi.macAddress();
 	root["cpu"] = ESP.getCpuFreqMHz();
 	root["sketchsize"] = ESP.getSketchSize();
