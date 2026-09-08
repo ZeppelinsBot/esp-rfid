@@ -153,34 +153,24 @@
             <label class="col-xs-3">Pin D0<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose Wiegand D0 pin."></i></label>
             <span class="col-xs-9 col-md-5">
                   <select class="form-control input-sm" id="wg0pin">
-                    <option value="0">GPIO-0</option>
-                    <option value="1">GPIO-1</option>
-                    <option value="2">GPIO-2</option>
-                    <option selected="selected" value="4">GPIO-4</option>
-                    <option value="5">GPIO-5</option>
-                    <option value="12">GPIO-12</option>
-                    <option value="13">GPIO-13</option>
-                    <option value="14">GPIO-14</option>
-                    <option value="15">GPIO-15</option>
-                    <option value="16">GPIO-16</option>
-                  </select>
+                <option value="0" selected="selected">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
                 </span>
         </div>
         <div class="row form-group">
             <label class="col-xs-3">Pin D1<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose Wiegand D1 pin."></i></label>
             <span class="col-xs-9 col-md-5">
                   <select class="form-control input-sm" id="wg1pin">
-                    <option value="0">GPIO-0</option>
-                    <option value="1">GPIO-1</option>
-                    <option value="2">GPIO-2</option>
-                    <option value="4">GPIO-4</option>
-                    <option selected="selected" value="5">GPIO-5</option>
-                    <option value="12">GPIO-12</option>
-                    <option value="13">GPIO-13</option>
-                    <option value="14">GPIO-14</option>
-                    <option value="15">GPIO-15</option>
-                    <option value="16">GPIO-16</option>
-                  </select>
+                <option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3" selected="selected">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
                 </span>
         </div>
         <div class="row form-group">
@@ -224,17 +214,12 @@
             <label class="col-xs-3">RDM6300 TX pin<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose which ESP pin is connected to RDM6300 TX pin"></i></label>
             <span class="col-xs-9 col-md-5">
                   <select class="form-control input-sm" id="rdm6300pin">
-                    <option value="0">GPIO-0</option>
-                    <option value="1">GPIO-1</option>
-                    <option value="2">GPIO-2</option>
-                    <option selected="selected" value="4">GPIO-4</option>
-                    <option value="5">GPIO-5</option>
-                    <option value="12">GPIO-12</option>
-                    <option value="13">GPIO-13</option>
-                    <option value="14">GPIO-14</option>
-                    <option value="15">GPIO-15</option>
-                    <option value="16">GPIO-16</option>
-                  </select>
+                <option value="0">GPIO-0</option>
+<option value="1" selected="selected">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
                 </span>
         </div>
     </div>
@@ -243,13 +228,16 @@
             <label class="col-xs-3">SPI SS<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose which ESP port is connected to RFID Hardware SDA pin"></i></label>
             <span class="col-xs-9 col-md-5">
                   <select class="form-control input-sm" id="gpioss">
-                    <option value="0">GPIO-0</option>
-                    <option value="2">GPIO-2</option>
-                    <option value="4">GPIO-4</option>
-                    <option value="5">GPIO-5</option>
-                    <option selected="selected" value="15">GPIO-15</option>
-                    <option value="16">GPIO-16</option>
-                  </select>
+                <option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="4">GPIO-4 (SPI SCK)</option>
+<option value="5">GPIO-5 (SPI MISO)</option>
+<option value="6">GPIO-6 (SPI MOSI)</option>
+<option value="7" selected="selected">GPIO-7 (SPI SS)</option>
+<option value="10">GPIO-10</option>
+                </select>
                 </span>
         </div>
         <div class="row form-group" id="rc522gain">
@@ -271,36 +259,26 @@
         <label class="col-xs-3">WiFi LED<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose &quot;WiFi LED&quot; pin"></i></label>
         <span class="col-xs-9 col-md-5">
               <select class="form-control input-sm" id="wifipin">
-                <option selected="selected" value="255">None</option>
-                <option value="0">GPIO-0</option>
-                <option value="1">GPIO-1</option>
-                <option value="2">GPIO-2 (LED_BUILTIN)</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-                <option value="15">GPIO-15</option>
-                <option value="16">GPIO-16</option>
-              </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <div class="row form-group">
         <label class="col-xs-3">Door Status Pin<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose &quot;Door Status&quot; pin"></i></label>
         <span class="col-xs-9 col-md-5">
               <select class="form-control input-sm" id="doorstatpin">
-                <option selected="selected" value="255">None</option>
-                <option value="0">GPIO-0</option>
-                <option value="1">GPIO-1</option>
-                <option value="2">GPIO-2</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-                <option value="15">GPIO-15</option>
-                <option value="16">GPIO-16 (OFFICIAL_BOARD)</option>
-              </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <div class="row form-group">
@@ -313,85 +291,65 @@
         <label class="col-xs-3">Doorbell Pin<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose &quot;Doorbell&quot; pin"></i></label>
         <span class="col-xs-9 col-md-5">
               <select class="form-control input-sm" id="doorbellpin">
-                <option selected="selected" value="255">None</option>
-                <option value="0">GPIO-0</option>
-                <option value="1">GPIO-1</option>
-                <option value="2">GPIO-2</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-                <option value="15">GPIO-15</option>
-                <option value="16">GPIO-16</option>
-              </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <div class="row form-group">
         <label class="col-xs-3">Open Lock Pin<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose a pin to have a button with equivalent behaviour to scan a valid card (open/close button)."></i></label>
         <span class="col-xs-9 col-md-5">
             <select class="form-control input-sm" id="openlockpin">
-                <option selected="selected" value="255">None</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-            </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <div class="row form-group">
         <label class="col-xs-3">Access denied LED<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose &quot;Access denied LED&quot; pin"></i></label>
         <span class="col-xs-9 col-md-5">
               <select class="form-control input-sm" id="accessdeniedpin">
-                <option selected="selected" value="255">None</option>
-                <option value="0">GPIO-0</option>
-                <option value="1">GPIO-1</option>
-                <option value="2">GPIO-2</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-                <option value="15">GPIO-15</option>
-                <option value="16">GPIO-16</option>
-              </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <div class="row form-group">
         <label class="col-xs-3">Beeper<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose &quot;Beeper&quot; pin"></i></label>
         <span class="col-xs-9 col-md-5">
               <select class="form-control input-sm" id="beeperpin">
-                <option selected="selected" value="255">None</option>
-                <option value="0">GPIO-0</option>
-                <option value="1">GPIO-1</option>
-                <option value="2">GPIO-2</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-                <option value="15">GPIO-15</option>
-                <option value="16">GPIO-16</option>
-              </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <div class="row form-group">
         <label class="col-xs-3">Pin waiting LED<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose &quot;Pin waiting LED&quot; pin"></i></label>
         <span class="col-xs-9 col-md-5">
               <select class="form-control input-sm" id="ledwaitingpin">
-                <option selected="selected" value="255">None</option>
-                <option value="0">GPIO-0</option>
-                <option value="1">GPIO-1</option>
-                <option value="2">GPIO-2</option>
-                <option value="4">GPIO-4</option>
-                <option value="5">GPIO-5</option>
-                <option value="12">GPIO-12</option>
-                <option value="13">GPIO-13</option>
-                <option value="14">GPIO-14</option>
-                <option value="15">GPIO-15</option>
-                <option value="16">GPIO-16</option>
-              </select>
+                <option value="255" selected="selected">None</option>
+<option value="0">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
+                </select>
         </span>
     </div>
     <hr>
@@ -426,16 +384,11 @@
         <label class="col-xs-3">Relay Pin<i style="margin-left: 10px;" class="glyphicon glyphicon-info-sign" aria-hidden="true" data-toggle="popover" data-trigger="hover" data-placement="right" data-content="Choose which ESP port is connected to your relay"></i></label>
         <span class="col-xs-6 col-md-5">
                 <select class="form-control input-sm" id="gpiorly">
-                    <option value="0">GPIO-0</option>
-                    <option value="1">GPIO-1</option>
-                    <option value="2">GPIO-2</option>
-                    <option selected="selected" value="4">GPIO-4</option>
-                    <option value="5">GPIO-5</option>
-                    <option value="12">GPIO-12</option>
-                    <option value="13">GPIO-13</option>
-                    <option value="14">GPIO-14</option>
-                    <option value="15">GPIO-15</option>
-                    <option value="16">GPIO-16</option>
+                <option value="0" selected="selected">GPIO-0</option>
+<option value="1">GPIO-1</option>
+<option value="2">GPIO-2</option>
+<option value="3">GPIO-3</option>
+<option value="10">GPIO-10</option>
                 </select>
               </span>
         <span class="col-xs-3">
