@@ -29,11 +29,18 @@ void connectToMqtt()
 	if (!config.mqttEnabled || mqttClient.connected()) {
 		return;
 	}
+	// Don't attempt connect if host is empty
+	if (!config.mqttHost || strlen(config.mqttHost) == 0) {
+		return;
+	}
 #ifdef DEBUG
 	Serial.println("[ INFO ] Connecting MQTT");
 #endif
 	String clientId = String(config.deviceHostname) + "-" + String(random(0xffff), HEX);
+	// mqttClient.connect() may block on DNS — feed the watchdog
+	yield();
 	bool connected = mqttClient.connect(clientId.c_str(), config.mqttUser, config.mqttPass);
+	yield();
 	if (connected) {
 		writeEvent("INFO", "mqtt", "Connected to MQTT Server", "");
 		// Publish boot message
@@ -739,15 +746,24 @@ void setupMqtt()
 		return;
 	}
 
+	// Guard against empty/NULL host — don't crash on invalid config
+	if (!config.mqttHost || strlen(config.mqttHost) == 0)
+	{
+		Serial.println(F("[WARN] MQTT host is empty, disabling MQTT"));
+		config.mqttEnabled = false;
+		return;
+	}
+
 #ifdef DEBUG
 	Serial.println("[ INFO ] Trying to setup MQTT");
 #endif
+	Serial.printf("[ INFO ] MQTT: %s:%d\n", config.mqttHost, config.mqttPort);
 	mqttClient.begin(config.mqttHost, config.mqttPort, mqttNet);
 	mqttClient.onMessage(onMqttMessage);
 
 	if (config.mqttHA)
 	{
-		String stopic(config.mqttTopic);
+		String stopic(config.mqttTopic ? config.mqttTopic : "esp-rfid");
 		String topicString = stopic + "/avty";
 		mqttClient.setWill(topicString.c_str(), "offline");
 	}
