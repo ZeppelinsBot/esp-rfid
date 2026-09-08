@@ -643,18 +643,17 @@ void setupWiegandReader(int d0, int d1, bool removeParityBits)
 
 void setupMFRC522Reader(int rfidss, int rfidgain)
 {
+	Serial.printf("[ INFO ] MFRC522 init: SS=%u, Gain=%u\n", rfidss, rfidgain);
 	SPI.begin(MFRC522_SCK, MFRC522_MISO, MFRC522_MOSI, rfidss);
-	mfrc522.PCD_Init(rfidss, UINT8_MAX); // Initialize MFRC522 Hardware
-	// Set RFID Hardware Antenna Gain
-	// This may not work with some boards
+	mfrc522.PCD_Init(rfidss, UINT8_MAX);
 	mfrc522.PCD_SetAntennaGain(rfidgain);
-#ifdef DEBUG
-	Serial.printf("[ INFO ] RFID SS_PIN: %u and Gain Factor: %u", rfidss, rfidgain);
-	Serial.println("");
-#endif
-#ifdef DEBUG
-	ShowMFRC522ReaderDetails(); // Show details of PCD - MFRC522 Card Reader details
-#endif
+	byte v = mfrc522.PCD_ReadRegister(mfrc522.VersionReg);
+	Serial.printf("[ INFO ] MFRC522 Version: 0x%02X\n", v);
+	if (v == 0x00 || v == 0xFF) {
+		Serial.println(F("[ WARN ] MFRC522 communication failure — check wiring!"));
+	} else {
+		Serial.println(F("[ INFO ] MFRC522 ready"));
+	}
 }
 
 void setupPN532Reader(int rfidss)

@@ -178,6 +178,28 @@ bool loadConfiguration(::Config &config)
 		int rmd6300TxPin = hardware["rdm6300pin"];
 		setupRDM6300Reader(rmd6300TxPin);
 	}
+
+	Serial.println(F("[CFG] === Hardware Config Dump ==="));
+	Serial.printf("[CFG] readertype: %d\n", config.readertype);
+	Serial.printf("[CFG] sspin: %d\n", rfidss);
+	Serial.printf("[CFG] rfidgain: %d\n", hardware["rfidgain"].as<int>());
+	Serial.printf("[CFG] rpin: %d\n", config.relayPin[0]);
+	Serial.printf("[CFG] rtype: %d\n", config.relayType[0]);
+	Serial.printf("[CFG] ltype: %d\n", config.lockType[0]);
+	Serial.printf("[CFG] numRelays: %d\n", config.numRelays);
+	Serial.println(F("[CFG] === Hardware Config End ==="));
+
+
+	Serial.println(F("[CFG] === Hardware Config Dump ==="));
+	Serial.printf("[CFG] readertype: %d\n", config.readertype);
+	Serial.printf("[CFG] sspin: %d\n", rfidss);
+	Serial.printf("[CFG] rfidgain: %d\n", hardware["rfidgain"].as<int>());
+	Serial.printf("[CFG] rpin: %d\n", config.relayPin[0]);
+	Serial.printf("[CFG] rtype: %d\n", config.relayType[0]);
+	Serial.printf("[CFG] ltype: %d\n", config.lockType[0]);
+	Serial.printf("[CFG] numRelays: %d\n", config.numRelays);
+	Serial.println(F("[CFG] === Hardware Config End ==="));
+
 	Serial.println(F("[CFG] hardware setup done"));
 	yield();
 
