@@ -127,6 +127,15 @@ bool enrollMifareClassic(String &outSecret) {
 		return false;
 	}
 
+	// Set global uid so the websocket handler can find the user file
+	uid = "";
+	for (byte i = 0; i < mfrc522.uid.size; i++) {
+		if (mfrc522.uid.uidByte[i] < 0x10) uid += "0";
+		uid += String(mfrc522.uid.uidByte[i], HEX);
+	}
+	uid.toLowerCase();
+	Serial.printf("[ENROLL] Card UID: %s\n", uid.c_str());
+
 	// Small delay to let the card settle after detection
 	delay(100);
 
