@@ -37,6 +37,7 @@ SOFTWARE.
 #include <time.h>
 #include <MQTTClient.h>
 #include <Bounce2.h>
+#include "esp_task_wdt.h"
 #include "src/magicnumbers.h"
 #include "src/config.h"
 
@@ -218,6 +219,11 @@ void setup()
 Serial.println(F("[BOOT] Relay LED pin init"));
 	pinMode(RELAY_LED_PIN, OUTPUT);
 	digitalWrite(RELAY_LED_PIN, HIGH); // LED off initially (active low)
+	// ESP32-C3 Task WDT: disable for main loop task.
+	// The MQTT library (256dpi/arduino-mqtt) blocks on WiFiClient.connect()
+	// during DNS resolution, which can exceed the 5s TWDT timeout.
+	// The Arduino loop has its own timing mechanisms and doesn't need WDT.
+	esp_task_wdt_delete(NULL);
 	Serial.println(F("[BOOT] setup complete"));
 }
 
