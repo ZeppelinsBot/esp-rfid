@@ -24,6 +24,11 @@ void mqttPublishEvent(JsonDocument *root);
 void mqttPublishEventHA(JsonDocument *root, String topic);
 void onMqttConnect();
 
+// Prevent MQTT connect for 30s after boot — gives user time to
+// access AP and disable MQTT if broker is unreachable.
+unsigned long mqttBootTime = 0;
+#define MQTT_BOOT_DELAY_MS 30000
+
 void connectToMqtt()
 {
 	if (!config.mqttEnabled || mqttClient.connected()) {
@@ -33,14 +38,17 @@ void connectToMqtt()
 	if (!config.mqttHost || strlen(config.mqttHost) == 0) {
 		return;
 	}
+	// Don't block on first boot — wait for BOOT_DELAY
+	if (millis() - mqttBootTime < MQTT_BOOT_DELAY_MS) {
+		return;
+	}
 #ifdef DEBUG
 	Serial.println("[ INFO ] Connecting MQTT");
 #endif
 	String clientId = String(config.deviceHostname) + "-" + String(random(0xffff), HEX);
-	// mqttClient.connect() may block on DNS — feed the watchdog
-	yield();
+	// Limit TCP connect timeout to avoid watchdog firing
+	mqttNet.setTimeout(5000);
 	bool connected = mqttClient.connect(clientId.c_str(), config.mqttUser, config.mqttPass);
-	yield();
 	if (connected) {
 		writeEvent("INFO", "mqtt", "Connected to MQTT Server", "");
 		// Publish boot message
