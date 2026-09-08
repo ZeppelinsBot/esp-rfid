@@ -110,6 +110,16 @@ AsyncWebSocket ws("/ws");
 #define BEEPERoff HIGH
 #define BEEPERon LOW
 
+// GPIO8 (blue LED on C3 SuperMini) = relay status indicator
+#define RELAY_LED_PIN 8
+// GPIO8 is active LOW: LOW=LED on, HIGH=LED off
+#define RELAY_LED_ON  LOW
+#define RELAY_LED_OFF HIGH
+
+// GPIO8 (blue LED on C3 SuperMini) = relay status indicator
+// GPIO8 (blue LED on C3 SuperMini) = relay status indicator
+// GPIO8 (blue LED on C3 SuperMini) = relay status indicator
+// GPIO8 (blue LED on C3 SuperMini) = relay status indicator
 // Variables for whole scope
 unsigned long cooldown = 0;
 unsigned long currentMillis = 0;
@@ -203,6 +213,9 @@ void setup()
 	setupWebServer();
 	Serial.println(F("[BOOT] Webserver setup done"));
 	writeEvent("INFO", "sys", "System setup completed, running", "");
+Serial.println(F("[BOOT] Relay LED pin init"));
+	pinMode(RELAY_LED_PIN, OUTPUT);
+	digitalWrite(RELAY_LED_PIN, HIGH); // LED off initially (active low)
 	Serial.println(F("[BOOT] setup complete"));
 }
 
@@ -262,6 +275,7 @@ void loop()
 					Serial.printf("activating relay %d now\n", currentRelay);
 #endif
 					digitalWrite(config.relayPin[currentRelay], config.relayType[currentRelay]);
+					digitalWrite(RELAY_LED_PIN, RELAY_LED_ON);
 				}
 				else // currently ON, need to switch OFF
 				{
@@ -271,6 +285,7 @@ void loop()
 					Serial.println(millis());
 					Serial.printf("deactivating relay %d now\n", currentRelay);
 #endif
+					digitalWrite(RELAY_LED_PIN, RELAY_LED_OFF);
 					digitalWrite(config.relayPin[currentRelay], !config.relayType[currentRelay]);
 				}
 				activateRelay[currentRelay] = false;
@@ -286,6 +301,7 @@ void loop()
 				Serial.println(millis());
 				Serial.printf("activating relay %d now\n", currentRelay);
 #endif
+				digitalWrite(RELAY_LED_PIN, RELAY_LED_ON);
 				digitalWrite(config.relayPin[currentRelay], config.relayType[currentRelay]);
 				previousMillis = millis();
 				activateRelay[currentRelay] = false;
@@ -303,6 +319,7 @@ void loop()
 				Serial.print("mili : ");
 				Serial.println(millis());
 #endif
+				digitalWrite(RELAY_LED_PIN, RELAY_LED_OFF);
 				digitalWrite(config.relayPin[currentRelay], !config.relayType[currentRelay]);
 				deactivateRelay[currentRelay] = false;
 			}
