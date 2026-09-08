@@ -116,9 +116,17 @@ MFRC522::MIFARE_Key defaultKey = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
  * Returns true on success.
  */
 bool enrollMifareClassic(String &outSecret) {
-	// Re-detect the card (PICC_HaltA was called after mfrc522Read)
-	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
-		Serial.println(F("[ENROLL] No card found for enrollment"));
+	// Wait for card to be presented (user must remove + re-present after scan)
+	Serial.println(F("[ENROLL] Waiting for card..."));
+	unsigned long start = millis();
+	while (millis() - start < 10000) {
+		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+			break;
+		}
+		delay(50);
+	}
+	if (!mfrc522.uid.size) {
+		Serial.println(F("[ENROLL] Timeout — no card found"));
 		return false;
 	}
 
