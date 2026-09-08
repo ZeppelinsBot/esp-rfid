@@ -25,6 +25,8 @@
 #define WIEGANDTYPE_KEYPRESS8 8
 #define WIEGANDTYPE_PICC24 24
 #define WIEGANDTYPE_PICC34 34
+#define WIEGAND_ENT 11  // '#' Key on Wiegand keypad
+#define WIEGAND_ESC 10  // '*' Key on Wiegand keypad
 
 #define RDM6300_BAUDRATE 9600
 #define RDM6300_READ_TIMEOUT 20
