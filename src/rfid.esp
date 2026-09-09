@@ -102,6 +102,11 @@ void wiegandRead()
 
 MFRC522::MIFARE_Key defaultKey = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
 
+// Sector 1, Block 4 — where we store the secret key
+#define SECRET_SECTOR 1
+#define SECRET_BLOCK  4
+#define SECRET_KEY_LEN 16
+
 bool loadSectorMasterKey(MFRC522::MIFARE_Key &key)
 {
 	String keyString = config.sectorMasterKey ? String(config.sectorMasterKey) : "4B7EA39D1F58";
@@ -202,11 +207,6 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 	mfrc522.PICC_HaltA(); mfrc522.PCD_StopCrypto1();
 	return status == MFRC522::STATUS_OK;
 }
-
-// Sector 1, Block 4 — where we store the secret key
-#define SECRET_SECTOR 1
-#define SECRET_BLOCK  4
-#define SECRET_KEY_LEN 16
 
 /*
  * Reset a MIFARE Classic sector trailer back to factory defaults.
