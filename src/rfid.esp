@@ -102,6 +102,21 @@ void wiegandRead()
 
 MFRC522::MIFARE_Key defaultKey = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
 
+bool loadSectorMasterKey(MFRC522::MIFARE_Key &key)
+{
+	String keyString = config.sectorMasterKey ? String(config.sectorMasterKey) : "4B7EA39D1F58";
+	if (keyString.length() != 12) return false;
+	for (int i = 0; i < 6; i++)
+	{
+		char hex[3] = { keyString[i * 2], keyString[i * 2 + 1], 0 };
+		char *end = nullptr;
+		long value = strtol(hex, &end, 16);
+		if (!end || *end != '\0' || value < 0 || value > 255) return false;
+		key.keyByte[i] = (byte)value;
+	}
+	return true;
+}
+
 // Sector 1, Block 4 — where we store the secret key
 #define SECRET_SECTOR 1
 #define SECRET_BLOCK  4
@@ -143,9 +158,14 @@ bool formatMifareSector() {
 	// Sector 2: blocks 8-11, trailer = block 11
 	const int SECTOR_TRAILER = SECRET_BLOCK + (3 - (SECRET_BLOCK % 4)); // block 7 for sector 1
 
-	// Try to authenticate to the sector trailer with default Key A
+	// Authenticate to the sector trailer with the configured master key
 	MFRC522::MIFARE_Key key;
-	memcpy(key.keyByte, defaultKey.keyByte, 6);
+	if (!loadSectorMasterKey(key)) {
+		Serial.println(F("[FORMAT] Invalid sector master key in config"));
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
 	MFRC522::StatusCode status;
 	for (int attempt = 0; attempt < 3; attempt++) {
 		status = mfrc522.PCD_Authenticate(
@@ -168,16 +188,24 @@ bool formatMifareSector() {
 		return false;
 	}
 	Serial.println(F("[FORMAT] Trailer auth OK, restoring defaults..."));
+	if (!loadSectorMasterKey(key)) {
+		Serial.println(F("[FORMAT] Invalid sector master key in config"));
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
 
 	// Default MIFARE Classic sector trailer:
 	// Key A: FF FF FF FF FF FF
 	// Access bits: FF 07 80 69 (factory default)
 	// Key B: FF FF FF FF FF FF
 	byte trailerData[16] = {
-		0x4B, 0x7E, 0xA3, 0x9D, 0x1F, 0x58,  // Key A (SECTOR_MASTER_KEY)
+		0, 0, 0, 0, 0, 0,                         // Key A (sector master key)
 		0xFF, 0x07, 0x80, 0x69,               // Access bits
-		0x4B, 0x7E, 0xA3, 0x9D, 0x1F, 0x58   // Key B (SECTOR_MASTER_KEY)
+		0, 0, 0, 0, 0, 0                         // Key B (sector master key)
 	};
+	memcpy(trailerData, key.keyByte, 6);
+	memcpy(trailerData + 10, key.keyByte, 6);
 
 	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerData, 16);
 	if (status != MFRC522::STATUS_OK) {
@@ -193,8 +221,6 @@ bool formatMifareSector() {
 	delay(100);
 	if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
 		delay(100);
-		byte verifyBytes[6] = SECTOR_MASTER_KEY;
-		memcpy(key.keyByte, verifyBytes, 6);
 		status = mfrc522.PCD_Authenticate(
 			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
 		if (status == MFRC522::STATUS_OK) {
@@ -331,7 +357,14 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	}
 
 	// Use fixed master sector key (defined in magicnumbers.h)
-	byte sectorKeyBuf[6] = SECTOR_MASTER_KEY;
+	byte sectorKeyBuf[6];
+	if (!loadSectorMasterKey(key)) {
+		Serial.println(F("[ENROLL] Invalid sector master key in config"));
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		return false;
+	}
+	memcpy(sectorKeyBuf, key.keyByte, 6);
 
 	// Replace Key A AND Key B with master key so nobody can read with default key
 	memcpy(trailerBuf, sectorKeyBuf, 6);           // Key A (bytes 0-5)
@@ -401,8 +434,13 @@ void mfrc522Read()
 	cardSecret = "";
 	// Use master sector key to read the secret
 	MFRC522::MIFARE_Key key;
-	byte masterBytes[6] = SECTOR_MASTER_KEY;
-	memcpy(key.keyByte, masterBytes, 6);
+	if (!loadSectorMasterKey(key)) {
+		Serial.println(F("[RFID] Invalid sector master key in config"));
+		mfrc522.PICC_HaltA();
+		mfrc522.PCD_StopCrypto1();
+		cooldown = millis() + COOLDOWN_MILIS;
+		return;
+	}
 
 	// Read secret from Sector 1 BEFORE PICC_HaltA puts card to sleep
 	{

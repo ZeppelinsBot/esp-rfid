@@ -46,6 +46,7 @@ struct Config {
     int readertype;
     int relayType[MAX_NUM_RELAYS];
     bool removeParityBits = true;
+    char *sectorMasterKey = NULL;
     IPAddress subnetIp;
     const char *ssid;
     char *tzInfo = (char *)"";

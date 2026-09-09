@@ -37,6 +37,7 @@ var config = {
         "rdm6300pin": 4,
         "sspin": 0,
         "rfidgain": 32,
+        "sectormasterkey": "4B7EA39D1F58",
         "wifipin": 255,
         "rtype": 1,
         "ltype": 0,
@@ -220,6 +221,7 @@ function listhardware() {
   document.getElementById("rdm6300pin").value = config.hardware.rdm6300pin;
   document.getElementById("gpioss").value = config.hardware.sspin;
   document.getElementById("gain").value = config.hardware.rfidgain;
+  document.getElementById("sectormasterkey").value = config.hardware.sectormasterkey || "4B7EA39D1F58";
   document.getElementById("gpiorly").value = config.hardware.rpin;
   document.getElementById("doorname").value = config.hardware.doorname || "";
   document.getElementById("numrlys").value = numRelays;
@@ -267,6 +269,11 @@ function uncommited() {
 }
 
 function savehardware() {
+  var sectorMasterKey = document.getElementById("sectormasterkey").value.trim().toUpperCase();
+  if (!/^[0-9A-F]{12}$/.test(sectorMasterKey)) {
+    alert("The MIFARE Sector Master Key must contain exactly 12 hexadecimal characters.");
+    return;
+  }
   config.hardware.readertype = parseInt(document.getElementById("readertype").value);
   config.hardware.wgd0pin = parseInt(document.getElementById("wg0pin").value);
   config.hardware.wgd1pin = parseInt(document.getElementById("wg1pin").value);
@@ -277,6 +284,7 @@ function savehardware() {
   config.hardware.removeparitybits = document.getElementById("removeparitybits").checked;
   config.hardware.sspin = parseInt(document.getElementById("gpioss").value);
   config.hardware.rfidgain = parseInt(document.getElementById("gain").value);
+  config.hardware.sectormasterkey = sectorMasterKey;
   config.hardware.rtype = parseInt(document.getElementById("typerly").value);
   config.hardware.ltype = parseInt(document.getElementById("lockType").value);
   config.hardware.rpin = parseInt(document.getElementById("gpiorly").value);

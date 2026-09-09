@@ -28,9 +28,6 @@
 #define WIEGAND_ENT 11  // '#' Key on Wiegand keypad
 #define WIEGAND_ESC 10  // '*' Key on Wiegand keypad
 
-// Master sector key for MIFARE Classic — only someone with firmware knows this
-#define SECTOR_MASTER_KEY { 0x4B, 0x7E, 0xA3, 0x9D, 0x1F, 0x58 }
-
 #define RDM6300_BAUDRATE 9600
 #define RDM6300_READ_TIMEOUT 20
 

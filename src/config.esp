@@ -132,6 +132,14 @@ bool loadConfiguration(::Config &config)
 		config.numRelays = 1;
 
 	config.readertype = hardware["readertype"];
+	// Keep the firmware default for existing configurations that do not yet
+	// contain the configurable MIFARE sector key.
+	const char *defaultSectorMasterKey = "4B7EA39D1F58";
+	if (hardware["sectormasterkey"].isNull() || hardware["sectormasterkey"].as<String>().length() != 12)
+		config.sectorMasterKey = strdup(defaultSectorMasterKey);
+	else
+		config.sectorMasterKey = strdup(hardware["sectormasterkey"].as<const char *>());
+
 	int rfidss;
 	config.pinCodeRequested = false;
 	config.pinCodeOnly = false;

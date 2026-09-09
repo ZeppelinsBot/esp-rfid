@@ -281,6 +281,7 @@ void processWsMessage(WsMessage *incomingMessage)
 			if (doc["general"].isNull())  doc["general"]  = JsonDocument();
 			if (doc["ntp"].isNull())      doc["ntp"]      = JsonDocument();
 			if (doc["mqtt"].isNull())     doc["mqtt"]     = JsonDocument();
+			if (doc["hardware"]["sectormasterkey"].isNull()) doc["hardware"]["sectormasterkey"] = "4B7EA39D1F58";
 			size_t len = measureJson(doc);
 			AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len + 1);
 			if (buffer)
@@ -313,6 +314,7 @@ void processWsMessage(WsMessage *incomingMessage)
 			doc["hardware"]["rtime"]       = 400;
 			doc["hardware"]["numrelays"]   = 1;
 			doc["hardware"]["wifipin"]     = 255;
+			doc["hardware"]["sectormasterkey"] = "4B7EA39D1F58";
 			doc["general"]["hostnm"]  = "esp-rfid";
 			doc["general"]["pswd"]    = "admin";
 			doc["general"]["restart"] = 0;
