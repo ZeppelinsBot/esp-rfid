@@ -95,6 +95,10 @@ void sendUserList(int page, AsyncWebSocketClient *client)
 					item["validsince"] = validsince;
 					item["validuntil"] = validuntil;
 					item["pincode"] = pincode;
+					// Preserve card identity data in backups. These fields are not
+					// displayed in the user table but are required for restore.
+					if (!json["secret"].isNull()) item["secret"] = json["secret"];
+					if (!json["sectorKey"].isNull()) item["sectorKey"] = json["sectorKey"];
 				}
 			}
 			i++;

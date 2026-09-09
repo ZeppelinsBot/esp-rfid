@@ -933,6 +933,8 @@ function restore1by1(i, len, data) {
   datatosend.pincode = data[i].pincode;
   datatosend.user = data[i].username;
   datatosend.acctype = data[i].acctype;
+  if (data[i].secret) datatosend.secret = data[i].secret;
+  if (data[i].sectorKey) datatosend.sectorKey = data[i].sectorKey;
   datatosend.validsince = data[i].validsince;
   datatosend.validuntil = data[i].validuntil;
   sendWebsocketWithRetry(JSON.stringify(datatosend));
