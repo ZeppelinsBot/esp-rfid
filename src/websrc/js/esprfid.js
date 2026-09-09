@@ -222,6 +222,7 @@ function listhardware() {
   document.getElementById("gpioss").value = config.hardware.sspin;
   document.getElementById("gain").value = config.hardware.rfidgain;
   document.getElementById("sectormasterkey").value = config.hardware.sectormasterkey || "4B7EA39D1F58";
+  document.getElementById("oldsectormasterkey").value = config.hardware.sectormasterkey || "4B7EA39D1F58";
   document.getElementById("gpiorly").value = config.hardware.rpin;
   document.getElementById("doorname").value = config.hardware.doorname || "";
   document.getElementById("numrlys").value = numRelays;
@@ -317,6 +318,28 @@ function saventp() {
   config.ntp.tzinfo = document.getElementById("DropDownTimezone").value;
 
   uncommited();
+}
+
+function migrateSectorCard() {
+  var oldKey = document.getElementById("oldsectormasterkey").value.trim().toUpperCase();
+  var newKey = document.getElementById("newsectormasterkey").value.trim().toUpperCase();
+  if (!/^[0-9A-F]{12}$/.test(oldKey) || !/^[0-9A-F]{12}$/.test(newKey) || oldKey === newKey) {
+    alert("Enter two different keys with exactly 12 hexadecimal characters.");
+    return;
+  }
+  if (confirm("Present the card now. It will be migrated without changing its secret.")) {
+    sendWebsocketWithRetry(JSON.stringify({command: "migratecard", oldkey: oldKey, newkey: newKey}));
+  }
+}
+
+function useMigratedSectorKey() {
+  var newKey = document.getElementById("newsectormasterkey").value.trim().toUpperCase();
+  if (!/^[0-9A-F]{12}$/.test(newKey)) {
+    alert("Enter a valid 12-character hexadecimal new key first.");
+    return;
+  }
+  document.getElementById("sectormasterkey").value = newKey;
+  savehardware();
 }
 
 function extractOpeningHours() {
@@ -1581,6 +1604,7 @@ function socketMessageListener(evt) {
         if (!('ltype' in config.hardware)) config.hardware.ltype = 0;
         if (!('useridstoragemode' in config.hardware)) config.hardware.useridstoragemode = "hexadecimal";
         if (!('removeparitybits' in config.hardware)) config.hardware.removeparitybits = true;
+        if (!('sectormasterkey' in config.hardware)) config.hardware.sectormasterkey = "4B7EA39D1F58";
         if ('numrelays' in config.hardware) numRelays = config.hardware["numrelays"]; else config.hardware["numrelays"] = numRelays;
         break;
       default:
@@ -1590,6 +1614,13 @@ function socketMessageListener(evt) {
   if (obj.hasOwnProperty("resultof")) {
     websocketMessagesToRetry.shift();
     switch (obj.resultof) {
+      case "migratecard":
+        if (obj.result === true) {
+          alert("Card migration succeeded. The card secret was preserved.");
+        } else {
+          alert("Card migration failed. Check the device serial output before trying again.");
+        }
+        break;
       case "latestlog":
         if (obj.result === false) {
           logdata = [];

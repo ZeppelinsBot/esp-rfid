@@ -259,6 +259,23 @@
                 <input class="form-control input-sm" id="sectormasterkey" type="text" maxlength="12" pattern="[0-9A-Fa-f]{12}" placeholder="4B7EA39D1F58">
             </span>
         </div>
+        <div class="panel panel-warning" id="sectorKeyMigrationPanel">
+            <div class="panel-heading"><strong>Existing card key migration</strong></div>
+            <div class="panel-body">
+                <p>Use this only for cards already enrolled with the old key. The card secret is not changed.</p>
+                <div class="row form-group">
+                    <label class="col-xs-3">Old key</label>
+                    <span class="col-xs-9 col-md-5"><input class="form-control input-sm" id="oldsectormasterkey" type="text" maxlength="12" placeholder="old 12-digit hex key"></span>
+                </div>
+                <div class="row form-group">
+                    <label class="col-xs-3">New key</label>
+                    <span class="col-xs-9 col-md-5"><input class="form-control input-sm" id="newsectormasterkey" type="text" maxlength="12" placeholder="new 12-digit hex key"></span>
+                </div>
+                <button type="button" class="btn btn-warning btn-sm" onclick="migrateSectorCard()">Migrate presented card</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="useMigratedSectorKey()">Use new key as standard</button>
+                <p class="help-block">Migration requires removing and re-presenting the card when requested. Check the serial output before proceeding to the next card.</p>
+            </div>
+        </div>
     </div>
     <hr>
     <div class="row form-group">

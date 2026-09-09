@@ -227,6 +227,13 @@ void processWsMessage(WsMessage *incomingMessage)
 			client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":false}");
 		}
 	}
+	else if (strcmp(command, "migratecard") == 0)
+	{
+		String oldKey = root["oldkey"].as<String>();
+		String newKey = root["newkey"].as<String>();
+		bool success = migrateMifareSector(oldKey, newKey);
+		client->text(String("{\"command\":\"result\",\"resultof\":\"migratecard\",\"result\":") + (success ? "true" : "false") + "}");
+	}
 	else if (strcmp(command, "testrelay1") == 0)
 	{
 		activateRelay[0] = true;
