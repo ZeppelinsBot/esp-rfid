@@ -694,6 +694,15 @@ void rfidProcess()
 		}
 		uid = v1uid;
 		Serial.printf("[RFID] Found v1 uid: %s\n", v1uid.c_str());
+		// The first open was for the new UID and is invalid when only the
+		// legacy UID file exists. Re-open the actual user file before reading it.
+		f = SPIFFS.open("/P/" + uid, "r");
+		if (!f)
+		{
+			processingState = unknown;
+			Serial.println(F("[RFID] Legacy user file could not be opened"));
+			return;
+		}
 	}
 
 	/*
@@ -730,9 +739,11 @@ void rfidProcess()
 		return;
 	}
 
-	// Secret Key verification — reject cloned chips
+	// Secret verification applies only to RC522/MIFARE cards. Wiegand,
+	// PN532 and RDM6300 readers do not populate cardSecret.
 	String storedSecret = json["secret"].as<String>();
-	if (!verifyMifareClassic(storedSecret))
+	if (config.readertype == READER_MFRC522 &&
+			storedSecret.length() > 0 && !verifyMifareClassic(storedSecret))
 	{
 		processingState = notValid;
 		Serial.println(F("[RFID] Secret verification FAILED — cloned chip?"));

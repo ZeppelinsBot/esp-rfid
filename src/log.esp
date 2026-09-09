@@ -79,6 +79,11 @@ void writeLatest(String uid, String username, int acctype, int access = ACCESS_G
 	root["timestamp"] = epoch;
 	ensureLogSpace("/latestlog.json");
 	File latestlog = SPIFFS.open("/latestlog.json", "a");
+	if (!latestlog)
+	{
+		Serial.println(F("[ERROR] Could not open /latestlog.json for append"));
+		return;
+	}
 	serializeJson(root, latestlog);
 	latestlog.print("\n");
 	latestlog.close();
