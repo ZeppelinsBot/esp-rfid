@@ -327,9 +327,8 @@ function migrateSectorCard() {
     alert("Enter two different keys with exactly 12 hexadecimal characters.");
     return;
   }
-  if (confirm("Present the card now. It will be migrated without changing its secret.")) {
-    sendWebsocketWithRetry(JSON.stringify({command: "migratecard", oldkey: oldKey, newkey: newKey}));
-  }
+  alert("Place the card on the reader and hold it for at least 5 seconds. Do not remove it until the result is shown.");
+  sendWebsocketWithRetry(JSON.stringify({command: "migratecard", oldkey: oldKey, newkey: newKey}));
 }
 
 function useMigratedSectorKey() {
