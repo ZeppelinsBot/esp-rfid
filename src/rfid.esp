@@ -176,7 +176,7 @@ bool formatMifareSector() {
 	byte trailerData[16] = {
 		0x4B, 0x7E, 0xA3, 0x9D, 0x1F, 0x58,  // Key A (SECTOR_MASTER_KEY)
 		0xFF, 0x07, 0x80, 0x69,               // Access bits
-		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Key B (default, for NFC tool compat)
+		0x4B, 0x7E, 0xA3, 0x9D, 0x1F, 0x58   // Key B (SECTOR_MASTER_KEY)
 	};
 
 	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerData, 16);
@@ -333,8 +333,9 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	// Use fixed master sector key (defined in magicnumbers.h)
 	byte sectorKeyBuf[6] = SECTOR_MASTER_KEY;
 
-	// Replace Key A (first 6 bytes of trailer) with our custom key
-	memcpy(trailerBuf, sectorKeyBuf, 6);
+	// Replace Key A AND Key B with master key so nobody can read with default key
+	memcpy(trailerBuf, sectorKeyBuf, 6);           // Key A (bytes 0-5)
+	memcpy(trailerBuf + 10, sectorKeyBuf, 6);      // Key B (bytes 10-15)
 
 	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerBuf, 16);
 	if (status != MFRC522::STATUS_OK) {
