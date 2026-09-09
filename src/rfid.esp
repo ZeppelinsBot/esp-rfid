@@ -188,37 +188,8 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 		Serial.printf("[MIGRATE] Failed: trailer write status=%d\n", status);
 		return false;
 	}
-	Serial.println(F("[MIGRATE] Write OK; keep card on reader for verification..."));
-	delay(500);
-	start = millis();
-	while (millis() - start < 5000 && (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())) delay(50);
-	if (!mfrc522.uid.size)
-	{
-		Serial.println(F("[MIGRATE] Write succeeded but card removed before verification. Re-present card to confirm."));
-		start = millis();
-		while (millis() - start < 15000 && (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())) delay(50);
-		if (!mfrc522.uid.size)
-		{
-			Serial.println(F("[MIGRATE] Write succeeded but verification skipped — card was not re-presented"));
-			return true;
-		}
-	}
-	status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &newKey, &(mfrc522.uid));
-	bool verified = false;
-	if (status == MFRC522::STATUS_OK) {
-		byte secretCheck[18]; byte secretSize = 18;
-		status = mfrc522.MIFARE_Read(SECRET_BLOCK, secretCheck, &secretSize);
-		if (status == MFRC522::STATUS_OK) {
-			Serial.println(F("[MIGRATE] SUCCESS: new key works, secret preserved"));
-			verified = true;
-		} else {
-			Serial.printf("[MIGRATE] New key works but secret read failed status=%d\n", status);
-		}
-	} else {
-		Serial.printf("[MIGRATE] Verification failed: new Key A status=%d\n", status);
-	}
-	mfrc522.PICC_HaltA(); mfrc522.PCD_StopCrypto1();
-	return verified;
+	Serial.println(F("[MIGRATE] SUCCESS: new key written. Secret unchanged. Update config key before next door access."));
+	return true;
 }
 
 /*

@@ -1617,9 +1617,9 @@ function socketMessageListener(evt) {
     switch (obj.resultof) {
       case "migratecard":
         if (obj.result === true) {
-          alert("Card migration succeeded. The card secret was preserved.");
+          alert("Card migration succeeded. The secret was preserved.\n\nIMPORTANT: You must click 'Use new key as standard' before the card will work for door access.");
         } else {
-          alert("Card migration failed. Check the device serial output before trying again.");
+          alert("Card migration failed. Old key may be wrong or card was not presented. Check serial output.");
         }
         break;
       case "latestlog":
