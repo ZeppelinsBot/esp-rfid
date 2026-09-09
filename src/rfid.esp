@@ -447,6 +447,8 @@ void mfrc522Read()
 	 *  maintain compatibility, calculate incorrect UID here as well for
 	 *  later checking in case old users exist in the config.
 	 */
+	uid = "";
+	v1uid = "";
 	for (byte i = 0; i < mfrc522.uid.size; i++) 
 	{
 		uid+=(String(mfrc522.uid.uidByte[i] < 0x10 ? "0" : ""));
