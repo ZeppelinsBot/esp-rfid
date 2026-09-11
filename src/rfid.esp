@@ -192,28 +192,6 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 	return true;
 }
 
-bool wipeMifareCard()
-{
-	Serial.println(F("[WIPE] Starting card wipe (format + remove user)..."));
-	bool formatted = formatMifareSector();
-	if (!formatted)
-	{
-		Serial.println(F("[WIPE] Failed: card formatting failed"));
-		return false;
-	}
-	String filename = "/P/" + uid;
-	if (SPIFFS.exists(filename))
-	{
-		SPIFFS.remove(filename);
-		Serial.printf("[WIPE] SUCCESS: card formatted and user %s removed\n", uid.c_str());
-	}
-	else
-	{
-		Serial.printf("[WIPE] Card formatted, but no user file %s found\n", uid.c_str());
-	}
-	return true;
-}
-
 /*
  * Reset a MIFARE Classic sector trailer back to factory defaults.
  * Tries to authenticate to the sector trailer with the default key.
@@ -324,6 +302,28 @@ bool formatMifareSector() {
 
 	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
+	return true;
+}
+
+bool wipeMifareCard()
+{
+	Serial.println(F("[WIPE] Starting card wipe (format + remove user)..."));
+	bool formatted = formatMifareSector();
+	if (!formatted)
+	{
+		Serial.println(F("[WIPE] Failed: card formatting failed"));
+		return false;
+	}
+	String filename = "/P/" + uid;
+	if (SPIFFS.exists(filename))
+	{
+		SPIFFS.remove(filename);
+		Serial.printf("[WIPE] SUCCESS: card formatted and user %s removed\n", uid.c_str());
+	}
+	else
+	{
+		Serial.printf("[WIPE] Card formatted, but no user file %s found\n", uid.c_str());
+	}
 	return true;
 }
 
