@@ -257,25 +257,17 @@ bool formatMifareSector() {
 		mfrc522.PCD_StopCrypto1();
 		return false;
 	}
-	Serial.println(F("[FORMAT] Trailer auth OK, restoring defaults..."));
-	if (!loadSectorMasterKey(key)) {
-		Serial.println(F("[FORMAT] Invalid sector master key in config"));
-		mfrc522.PICC_HaltA();
-		mfrc522.PCD_StopCrypto1();
-		return false;
-	}
+	Serial.println(F("[FORMAT] Trailer auth OK, restoring factory defaults..."));
 
-	// Default MIFARE Classic sector trailer:
+	// Factory default MIFARE Classic sector trailer:
 	// Key A: FF FF FF FF FF FF
-	// Access bits: FF 07 80 69 (factory default)
+	// Access bits: FF 07 80 69
 	// Key B: FF FF FF FF FF FF
 	byte trailerData[16] = {
-		0, 0, 0, 0, 0, 0,                         // Key A (sector master key)
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // Key A (factory default)
 		0xFF, 0x07, 0x80, 0x69,               // Access bits
-		0, 0, 0, 0, 0, 0                         // Key B (sector master key)
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Key B (factory default)
 	};
-	memcpy(trailerData, key.keyByte, 6);
-	memcpy(trailerData + 10, key.keyByte, 6);
 
 	status = mfrc522.MIFARE_Write(SECTOR_TRAILER, trailerData, 16);
 	if (status != MFRC522::STATUS_OK) {
@@ -285,16 +277,18 @@ bool formatMifareSector() {
 		return false;
 	}
 
-	// Verify: try to authenticate with master key
+	// Verify: try to authenticate with factory default key
 	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
 	delay(100);
 	if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
 		delay(100);
+		MFRC522::MIFARE_Key defaultVerifyKey;
+		memcpy(defaultVerifyKey.keyByte, defaultKey.keyByte, 6);
 		status = mfrc522.PCD_Authenticate(
-			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &key, &(mfrc522.uid));
+			MFRC522::PICC_CMD_MF_AUTH_KEY_A, SECRET_BLOCK, &defaultVerifyKey, &(mfrc522.uid));
 		if (status == MFRC522::STATUS_OK) {
-			Serial.println(F("[FORMAT] Success! Sector restored with master key."));
+			Serial.println(F("[FORMAT] Success! Sector restored to factory defaults."));
 		} else {
 			Serial.printf("[FORMAT] Verify auth failed: %d\n", status);
 		}
