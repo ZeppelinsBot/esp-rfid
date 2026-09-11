@@ -272,6 +272,7 @@
                     <span class="col-xs-9 col-md-5"><input class="form-control input-sm" id="newsectormasterkey" type="text" maxlength="12" placeholder="new 12-digit hex key"></span>
                 </div>
                 <button type="button" class="btn btn-warning btn-sm" onclick="migrateSectorCard()">Migrate presented card</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="wipeSectorCard()">Wipe card (format + remove user)</button>
                 <button type="button" class="btn btn-primary btn-sm" onclick="useMigratedSectorKey()">Use new key as standard</button>
                 <p class="help-block">Migration requires removing and re-presenting the card when requested. Check the serial output before proceeding to the next card.</p>
             </div>
