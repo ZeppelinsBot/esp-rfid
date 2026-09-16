@@ -152,6 +152,19 @@ bool lockAllSectors()
 {
 	Serial.println(F("[LOCK] Locking all 16 sector trailers with master key..."));
 
+	// Halt any existing crypto session from enrollMifareClassic() before starting
+	mfrc522.PICC_HaltA();
+	mfrc522.PCD_StopCrypto1();
+	delay(200);
+
+	// Re-detect card in clean state
+	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())
+	{
+		Serial.println(F("[LOCK] Failed: card lost before locking"));
+		return false;
+	}
+	delay(100);
+
 	MFRC522::MIFARE_Key masterKey;
 	if (!loadSectorMasterKey(masterKey))
 	{
