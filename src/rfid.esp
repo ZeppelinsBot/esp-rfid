@@ -152,9 +152,10 @@ bool lockAllSectors()
 {
 	Serial.println(F("[LOCK] Locking all 16 sector trailers with master key..."));
 
-	// Halt any existing crypto session from enrollMifareClassic() before starting
-	mfrc522.PICC_HaltA();
+	// Stop crypto BEFORE halt — otherwise the HLTA command is encrypted
+	// and the card won't understand it (MIFARE Classic ignores encrypted HLTA)
 	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
 	delay(200);
 
 	// Re-detect card in clean state
@@ -183,8 +184,8 @@ bool lockAllSectors()
 			// Halt + re-detect before each attempt to ensure clean crypto state
 			if (attempt > 0)
 			{
-				mfrc522.PICC_HaltA();
 				mfrc522.PCD_StopCrypto1();
+				mfrc522.PICC_HaltA();
 				delay(200);
 				if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())
 				{
@@ -251,8 +252,8 @@ bool lockAllSectors()
 			locked = true;
 
 			// Halt after each successful lock to reset crypto state for next sector
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 			delay(100);
 		}
 
@@ -261,8 +262,8 @@ bool lockAllSectors()
 			Serial.printf("[LOCK] Sector %d: FAILED after 3 attempts\n", sec);
 			allOk = false;
 			// Halt to clean up state before trying next sector
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 		}
 		else if (sec < NUM_MIFARE_SECTORS - 1)
 		{
@@ -278,8 +279,8 @@ bool lockAllSectors()
 		}
 	}
 
-	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
 	if (allOk)
 		Serial.println(F("[LOCK] SUCCESS: all 16 sectors locked with master key"));
 	else
@@ -324,8 +325,8 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 			// Halt + re-detect before each attempt to ensure clean crypto state
 			if (attempt > 0)
 			{
-				mfrc522.PICC_HaltA();
 				mfrc522.PCD_StopCrypto1();
+				mfrc522.PICC_HaltA();
 				delay(200);
 				if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())
 				{
@@ -364,8 +365,8 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 			locked = true;
 
 			// Halt after each successful migration to reset crypto state for next sector
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 			delay(100);
 		}
 
@@ -373,8 +374,8 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 		{
 			Serial.printf("[MIGRATE] Sector %d: FAILED after 3 attempts\n", sec);
 			allOk = false;
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 		}
 		else if (sec < NUM_MIFARE_SECTORS - 1)
 		{
@@ -390,7 +391,7 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 		}
 	}
 
-	mfrc522.PICC_HaltA(); mfrc522.PCD_StopCrypto1();
+	mfrc522.PCD_StopCrypto1(); mfrc522.PICC_HaltA();
 	if (allOk)
 		Serial.println(F("[MIGRATE] SUCCESS: all sectors migrated. Secret unchanged. Update config key before next door access."));
 	else
@@ -431,8 +432,8 @@ bool formatMifareCard() {
 	MFRC522::MIFARE_Key key;
 	if (!loadSectorMasterKey(key)) {
 		Serial.println(F("[FORMAT] Invalid sector master key in config"));
-		mfrc522.PICC_HaltA();
 		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		return false;
 	}
 
@@ -457,8 +458,8 @@ bool formatMifareCard() {
 			// Halt + re-detect before retry to ensure clean crypto state
 			if (attempt > 0)
 			{
-				mfrc522.PICC_HaltA();
 				mfrc522.PCD_StopCrypto1();
+				mfrc522.PICC_HaltA();
 				delay(200);
 				if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())
 				{
@@ -496,8 +497,8 @@ bool formatMifareCard() {
 			formatted = true;
 
 			// Halt after each successful format to reset crypto state
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 			delay(100);
 		}
 
@@ -505,8 +506,8 @@ bool formatMifareCard() {
 		{
 			Serial.printf("[FORMAT] Sector %d: FAILED after 3 attempts\n", sec);
 			allOk = false;
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 		}
 		else if (sec < NUM_MIFARE_SECTORS - 1)
 		{
@@ -522,8 +523,8 @@ bool formatMifareCard() {
 	}
 
 	// Verify: try to authenticate with factory default key on Sector 1
-	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
 	delay(100);
 	if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
 		delay(100);
@@ -538,8 +539,8 @@ bool formatMifareCard() {
 		}
 	}
 
-	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
 
 	if (allOk)
 		Serial.println(F("[FORMAT] SUCCESS: all 16 sectors restored to factory defaults."));
@@ -612,8 +613,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 		if (status == MFRC522::STATUS_OK) break;
 		Serial.printf("[ENROLL] Auth attempt %d failed: %d\n", attempt + 1, status);
 		if (attempt < 2) {
-			mfrc522.PICC_HaltA();
 			mfrc522.PCD_StopCrypto1();
+			mfrc522.PICC_HaltA();
 			delay(200);
 			// Re-detect card
 			if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
@@ -623,8 +624,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	}
 	if (status != MFRC522::STATUS_OK) {
 		Serial.printf("[ENROLL] Auth failed after retries: %d\n", status);
-		mfrc522.PICC_HaltA();
 		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		return false;
 	}
 
@@ -643,8 +644,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	}
 	if (status != MFRC522::STATUS_OK) {
 		Serial.printf("[ENROLL] Write failed after retries: %d\n", status);
-		mfrc522.PICC_HaltA();
 		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		return false;
 	}
 
@@ -664,8 +665,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	}
 	if (!verified) {
 		Serial.println(F("[ENROLL] Verify failed after retries"));
-		mfrc522.PICC_HaltA();
 		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		return false;
 	}
 
@@ -680,8 +681,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	// --- Lock ALL sectors with master key ---
 	if (!loadSectorMasterKey(key)) {
 		Serial.println(F("[ENROLL] Invalid sector master key in config"));
-		mfrc522.PICC_HaltA();
 		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		return false;
 	}
 
@@ -698,8 +699,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 		Serial.println(F("[ENROLL] Warning: some sectors could not be locked"));
 	}
 
-	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
 
 	Serial.printf("[ENROLL] Success! Secret: %s SectorKey: %s\n", outSecret.c_str(), outSectorKey.c_str());
 	return true;
@@ -748,8 +749,8 @@ void mfrc522Read()
 	MFRC522::MIFARE_Key key;
 	if (!loadSectorMasterKey(key)) {
 		Serial.println(F("[RFID] Invalid sector master key in config"));
-		mfrc522.PICC_HaltA();
 		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		cooldown = millis() + COOLDOWN_MILIS;
 		return;
 	}
@@ -788,8 +789,8 @@ void mfrc522Read()
 			}
 		}
 	}
-	mfrc522.PICC_HaltA();
 	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
 	cooldown = millis() + COOLDOWN_MILIS;
 
 	/*
