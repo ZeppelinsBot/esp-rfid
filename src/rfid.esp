@@ -222,37 +222,53 @@ bool lockAllSectors()
 			mfrc522.PCD_StopCrypto1();
 			delay(50);
 
-			// Erst Master-Key versuchen, dann Default-Key
+			// Reihenfolge: Default-Key ZUERST (frische Karten haben FF-Keys),
+			// Master-Key als Fallback. Grund: Ein fehlgeschlagener MFAuthent
+			// auf dem RC522-Clone vergiftet den Transceiver -> STATUS_TIMEOUT(3)
+			// fuer alle Folge-Auths. Default-Key vermeidet den Fehlversuch auf
+			// frischen Karten komplett.
 			bool authed = false;
-			MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
-				MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailer, &masterKey, &(mfrc522.uid));
+			MFRC522::StatusCode status;
+
+			// 1) Default-Key zuerst
+			MFRC522::MIFARE_Key defKey;
+			memcpy(defKey.keyByte, defaultKey.keyByte, 6);
+			status = mfrc522.PCD_Authenticate(
+				MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailer, &defKey, &(mfrc522.uid));
 			if (status == MFRC522::STATUS_OK)
 			{
 				authed = true;
 			#ifdef DEBUG
-				Serial.printf("[LOCK] Sector %d: authenticated with master key\n", sec);
+				Serial.printf("[LOCK] Sector %d: authenticated with default key\n", sec);
 			#endif
 			}
 			else
 			{
-				// Fallback: Default-Key
-				MFRC522::MIFARE_Key defKey;
-				memcpy(defKey.keyByte, defaultKey.keyByte, 6);
+				// Entgiftung nach fehlgeschlagenem Default-Auth:
+				// CommandReg auf Idle + Crypto beenden -> RC522-Clone sauber
+				mfrc522.PCD_WriteRegister(MFRC522::CommandReg, MFRC522::PCD_Idle);
+				mfrc522.PCD_StopCrypto1();
+				delay(50);
+
+				// 2) Master-Key als Fallback
 				status = mfrc522.PCD_Authenticate(
-					MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailer, &defKey, &(mfrc522.uid));
+					MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailer, &masterKey, &(mfrc522.uid));
 				if (status == MFRC522::STATUS_OK)
 				{
 					authed = true;
 				#ifdef DEBUG
-					Serial.printf("[LOCK] Sector %d: authenticated with default key\n", sec);
+					Serial.printf("[LOCK] Sector %d: authenticated with master key\n", sec);
 				#endif
 				}
 			}
 
 			if (!authed)
 			{
+				// Entgiftung nach komplett fehlgeschlagenem Auth (beide Keys)
+				mfrc522.PCD_WriteRegister(MFRC522::CommandReg, MFRC522::PCD_Idle);
+				mfrc522.PCD_StopCrypto1();
+				delay(50);
 				Serial.printf("[LOCK] Sector %d attempt %d: auth failed status=%d\n", sec, attempt + 1, status);
-				delay(100);
 				continue;
 			}
 
