@@ -203,22 +203,24 @@ bool lockAllSectors()
 		return false;
 	}
 
-	// End any active crypto session from prior auth (e.g. verify/enroll read)
-	// so the card receives unencrypted commands.
-	mfrc522.PCD_StopCrypto1();
-	mfrc522.PICC_HaltA();
-	delay(100);
-	if (!reselectCard())
-	{
-		Serial.println(F("[LOCK] Failed: card lost before locking"));
-		return false;
-	}
-
 	bool allOk = true;
 	for (int sec = 0; sec < NUM_MIFARE_SECTORS; sec++)
 	{
 		const byte trailer = SECTOR_TRAILER_BLOCKS[sec];
 		bool locked = false;
+
+		// Fresh re-select before each sector's first auth — a stale selection
+		// (from the previous sector's auth/write) makes the new auth timeout.
+		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
+		delay(100);
+		if (!reselectCard())
+		{
+			Serial.printf("[LOCK] Sector %d: card lost before sector auth\n", sec);
+			Serial.printf("[LOCK] Sector %d: FAILED after 3 attempts\n", sec);
+			allOk = false;
+			continue;
+		}
 
 		for (int attempt = 0; attempt < 3 && !locked; attempt++)
 		{
