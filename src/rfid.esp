@@ -150,6 +150,11 @@ bool loadSectorMasterKeyString(const String &keyString, MFRC522::MIFARE_Key &key
  */
 bool reselectCard() {
 	delay(200);
+	// If the card is still selected (ACTIVE state), it ignores both REQA and WUPA.
+	// Send HLTA first (ignoring the result) to force it into HALT state,
+	// then WUPA reliably wakes it for re-selection.
+	mfrc522.PICC_HaltA();
+	delay(50);
 	byte bufferATQA[2];
 	byte bufferSize = 2;
 	MFRC522::StatusCode result = mfrc522.PICC_WakeupA(bufferATQA, &bufferSize);
