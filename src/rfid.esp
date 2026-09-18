@@ -106,6 +106,29 @@ void wiegandRead()
 
 MFRC522::MIFARE_Key defaultKey = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}};
 
+// Harter Reset des MFRC522(-Clones) nach einem fehlgeschlagenen Auth:
+// PCD_Reset+PCD_Init+AntennaOn bringen den Chip in einen sauberen Zustand
+// (CommandReg-Idle allein reicht bei Clones nicht — sonst TIMEOUT-Kaskade).
+// Danach Karte frisch per REQA selektieren (KEIN Halt/WUPA).
+// Gibt true zurück, wenn die Karte nach dem Reset frisch selektiert wurde.
+bool hardResetAndReselectCard() {
+	mfrc522.PCD_Reset();
+	delay(50);
+	mfrc522.PCD_Init(rfidss, UINT8_MAX);
+	mfrc522.PCD_AntennaOn();
+	delay(100);
+	// Frische REQA-Selektion (geduldiger Loop, wie im Enroll-Einstieg)
+	unsigned long start = millis();
+	while (millis() - start < 4000) {
+		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+			delay(100);
+			return true;
+		}
+		delay(150);
+	}
+	return false;
+}
+
 // Sector 1, Block 4 — where we store the secret key
 #define SECRET_SECTOR 1
 #define SECRET_BLOCK  4
@@ -244,11 +267,13 @@ bool lockAllSectors()
 			}
 			else
 			{
-				// Entgiftung nach fehlgeschlagenem Default-Auth:
-				// CommandReg auf Idle + Crypto beenden -> RC522-Clone sauber
-				mfrc522.PCD_WriteRegister(MFRC522::CommandReg, MFRC522::PCD_Idle);
-				mfrc522.PCD_StopCrypto1();
-				delay(50);
+				// Harter Reset nach fehlgeschlagenem Default-Auth:
+				// CommandReg-Idle reicht bei Clones nicht -> PCD_Reset+Init+AntennaOn
+				Serial.printf("[LOCK] Sector %d: default key failed — hard resetting reader\n", sec);
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[LOCK] Sector %d: card lost after reader reset\n", sec);
+					continue;
+				}
 
 				// 2) Master-Key als Fallback
 				status = mfrc522.PCD_Authenticate(
@@ -264,10 +289,10 @@ bool lockAllSectors()
 
 			if (!authed)
 			{
-				// Entgiftung nach komplett fehlgeschlagenem Auth (beide Keys)
-				mfrc522.PCD_WriteRegister(MFRC522::CommandReg, MFRC522::PCD_Idle);
-				mfrc522.PCD_StopCrypto1();
-				delay(50);
+				// Harter Reset nach komplett fehlgeschlagenem Auth (beide Keys)
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[LOCK] Sector %d: card lost after reader reset\n", sec);
+				}
 				Serial.printf("[LOCK] Sector %d attempt %d: auth failed status=%d\n", sec, attempt + 1, status);
 				continue;
 			}
@@ -634,12 +659,10 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 		if (status == MFRC522::STATUS_OK) break;
 		Serial.printf("[ENROLL] Auth attempt %d failed: %d\n", attempt + 1, status);
 		if (attempt < 2) {
-			delay(200);
-			mfrc522.PCD_StopCrypto1();
-			// REQA-Re-Select im Retry: Selektion erneuern, damit der Clone
-			// die Karte nicht "vergisst". Kein WUPA, kein Halt.
-			if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-				delay(100);
+			Serial.printf("[ENROLL] Auth failed (status %d) — hard resetting reader\n", status);
+			if (!hardResetAndReselectCard()) {
+				Serial.println(F("[ENROLL] Card lost after reader reset"));
+				return false;
 			}
 		}
 	}

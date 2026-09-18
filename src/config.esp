@@ -140,7 +140,6 @@ bool loadConfiguration(::Config &config)
 	else
 		config.sectorMasterKey = strdup(hardware["sectormasterkey"].as<const char *>());
 
-	int rfidss;
 	config.pinCodeRequested = false;
 	config.pinCodeOnly = false;
 	if (config.readertype == READER_WIEGAND || config.readertype == READER_WIEGAND_RDM6300)

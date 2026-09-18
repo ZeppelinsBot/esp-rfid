@@ -22,7 +22,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
  */
-#define VERSION "2.0.0-esp32c3-20260918-r23"
+#define VERSION "2.0.0-esp32c3-20260918-r24"
 
 #include "Arduino.h"
 #include <WiFi.h>
@@ -54,6 +54,9 @@ PN532 pn532;
 WIEGAND wg;
 RFID_Reader RFIDr;
 HardwareSerial *rdm6300HwSerial = NULL;
+// MFRC522 SS pin — global so hardResetAndReselectCard() can re-init the reader.
+// Default 7 (common for ESP32-C3 + RC522); overwritten by config load.
+int rfidss = 7;
 
 // relay specific variables
 bool activateRelay[MAX_NUM_RELAYS] = {false, false, false, false};
