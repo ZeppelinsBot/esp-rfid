@@ -580,24 +580,26 @@ bool wipeMifareCard()
  * Returns true on success.
  */
 bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
-	// Karte unmittelbar vor der Auth frisch per REQA selektieren — exakt die
-	// Sequenz, die heute (11:05) als einzige den Block-4-Auth durchbrachte.
-	// KEIN HaltA/WUPA (bricht den RC522-Clone), nur REQA-Selektion.
-	delay(150);
-	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+	// Geduldige frische REQA-Selektion direkt vor der Auth: Der Loop-Scan
+	// hat die Karte evtl. gerade selektiert (ACTIVE ignoriert REQA) — also
+	// REQA wiederholt senden, bis sich die Karte (nach kurzer Ruhe in IDLE)
+	// frisch fangen laesst. Exakt die Sequenz, die heute (11:05) als einzige
+	// den Block-4-Auth durchbrachte. KEIN HaltA/WUPA (bricht den RC522-Clone).
+	unsigned long reSelectStart = millis();
+	bool reSelected = false;
+	while (millis() - reSelectStart < 4000) {
+		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+			reSelected = true;
+			break;
+		}
+		delay(150);
+	}
+	if (!reSelected) {
 		Serial.println(F("[ENROLL] No card on reader"));
 		return false;
 	}
 	mfrc522.PCD_StopCrypto1();
 	delay(100);
-
-	// mfrc522.uid is freshly populated by the REQA select above.
-	// Build uid string from it.
-	uid = "";
-	for (byte i = 0; i < mfrc522.uid.size; i++) {
-		if (mfrc522.uid.uidByte[i] < 0x10) uid += "0";
-		uid += String(mfrc522.uid.uidByte[i], HEX);
-	}
 	uid.toLowerCase();
 	Serial.printf("[ENROLL] Card UID: %s\n", uid.c_str());
 
