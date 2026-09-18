@@ -153,18 +153,29 @@ bool loadSectorMasterKeyString(const String &keyString, MFRC522::MIFARE_Key &key
  * Returns true if the card was successfully re-selected.
  */
 bool reselectCard() {
-	delay(200);
-	// If the card is still selected (ACTIVE state), it ignores both REQA and WUPA.
-	// Send HLTA first (ignoring the result) to force it into HALT state,
-	// then WUPA reliably wakes it for re-selection.
+	// Der RC522 (Clone, Version 0x92) braucht nach HLTA deutlich mehr
+	// Vorlauf, bevor WUPA zuverlässig antwortet. Deshalb: lange Pause,
+	// dann WUPA mit Retries, dann Selektion mit kurzer Settle-Pause.
+	delay(300);
 	mfrc522.PICC_HaltA();
-	delay(50);
+	delay(300);
 	byte bufferATQA[2];
 	byte bufferSize = 2;
-	MFRC522::StatusCode result = mfrc522.PICC_WakeupA(bufferATQA, &bufferSize);
-	if (result != MFRC522::STATUS_OK) return false;
-	if (!mfrc522.PICC_ReadCardSerial()) return false;
-	delay(100);
+	bool found = false;
+	for (int i = 0; i < 5 && !found; i++) {
+		if (mfrc522.PICC_WakeupA(bufferATQA, &bufferSize) == MFRC522::STATUS_OK) {
+			found = true;
+		} else {
+			delay(150);
+		}
+	}
+	if (!found) return false;
+	if (!mfrc522.PICC_ReadCardSerial()) {
+		// Einmal wiederholen nach kurzer Pause
+		delay(100);
+		if (!mfrc522.PICC_ReadCardSerial()) return false;
+	}
+	delay(200);
 	return true;
 }
 
@@ -587,12 +598,13 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	// this is now reliable — subsequent auth needs fresh selection.
 	mfrc522.PCD_StopCrypto1();
 	mfrc522.PICC_HaltA();
-	delay(100);
+	// reselectCard() enthält bereits delay(300)+HaltA+delay(300) —
+	// kein zusätzliches delay nötig vor dem Aufruf.
 	if (!reselectCard()) {
 		Serial.println(F("[ENROLL] No card on reader"));
 		return false;
 	}
-	delay(100);
+	delay(200);
 
 	// mfrc522.uid must be populated (by caller or reselectCard above).
 	// Build uid string from it.
