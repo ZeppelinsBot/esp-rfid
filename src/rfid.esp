@@ -580,14 +580,18 @@ bool wipeMifareCard()
  * Returns true on success.
  */
 bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
-	// Die Karte kommt frisch per REQA aus dem Loop-Scan (PICC_IsNewCardPresent +
-	// PICC_ReadCardSerial) — AUF DIESEM RC522-CLONE ist die Karte dann nur
-	// authentifizierbar, wenn sie NICHT erst gehalted/gewaked wird (Halt+WUPA
-	// führt zuverlässig zu STATUS_TIMEOUT). Also: direkt authentifizieren.
-	mfrc522.PCD_StopCrypto1();
+	// Karte unmittelbar vor der Auth frisch per REQA selektieren — exakt die
+	// Sequenz, die heute (11:05) als einzige den Block-4-Auth durchbrachte.
+	// KEIN HaltA/WUPA (bricht den RC522-Clone), nur REQA-Selektion.
 	delay(150);
+	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial()) {
+		Serial.println(F("[ENROLL] No card on reader"));
+		return false;
+	}
+	mfrc522.PCD_StopCrypto1();
+	delay(100);
 
-	// mfrc522.uid is populated by the caller (PICC_ReadCardSerial in loop).
+	// mfrc522.uid is freshly populated by the REQA select above.
 	// Build uid string from it.
 	uid = "";
 	for (byte i = 0; i < mfrc522.uid.size; i++) {
@@ -612,10 +616,13 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 		if (status == MFRC522::STATUS_OK) break;
 		Serial.printf("[ENROLL] Auth attempt %d failed: %d\n", attempt + 1, status);
 		if (attempt < 2) {
-			mfrc522.PCD_StopCrypto1();
 			delay(200);
-			// Kein Halt/WUPA — die Karte bleibt selektiert; einfach erneut
-			// versuchen, nachdem die Crypto-Session sauber beendet ist.
+			mfrc522.PCD_StopCrypto1();
+			// REQA-Re-Select im Retry: Selektion erneuern, damit der Clone
+			// die Karte nicht "vergisst". Kein WUPA, kein Halt.
+			if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+				delay(100);
+			}
 		}
 	}
 	if (status != MFRC522::STATUS_OK) {
