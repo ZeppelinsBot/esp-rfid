@@ -571,6 +571,8 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	MFRC522::StatusCode status;
 	// Ensure clean crypto state before first auth attempt
 	mfrc522.PCD_StopCrypto1();
+	// Small delay to let the card settle after crypto reset (ESP32 RTOS needs this)
+	delay(100);
 
 	for (int attempt = 0; attempt < 3; attempt++) {
 		status = mfrc522.PCD_Authenticate(
@@ -783,6 +785,8 @@ void mfrc522Read()
 	// This avoids the reselectCard() problem that caused "No card on reader".
 	String probeFile = "/P/" + uid;
 	bool userExists = SPIFFS.exists(probeFile) || SPIFFS.exists("/P/" + v1uid);
+	Serial.printf("[RFID] Checking %s exists...\n", probeFile.c_str());
+	Serial.printf("[RFID] exists=%d\n", userExists ? 1 : 0);
 
 	if (!userExists && enrollPending && !enrollRunning && config.readertype == READER_MFRC522) {
 		enrollRunning = true;
