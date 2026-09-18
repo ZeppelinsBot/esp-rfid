@@ -192,78 +192,46 @@ void processWsMessage(WsMessage *incomingMessage)
 	}
 	else if (strcmp(command, "enroll") == 0)
 	{
-		String secret = "";
-		String sectorKey = "";
-		bool success = enrollMifareClassic(secret, sectorKey);
-		if (success) {
-			// Save secret to user JSON (sectorKey is fixed in firmware, no need to store per-card)
-			String filename = "/P/" + String(uid);
-			File f = SPIFFS.open(filename, "r");
-			if (f) {
-				size_t size = f.size();
-				std::unique_ptr<char[]> buf(new char[size]);
-				f.readBytes(buf.get(), size);
-				f.close();
-				JsonDocument json;
-				deserializeJson(json, buf.get(), size);
-				json["secret"] = secret;
-				// Auto-name as neuerUserN if no name set
-				String currentName = json["user"].as<String>();
-				if (currentName.length() == 0 || currentName == "null" || currentName == "undefined") {
-					int maxN = 0;
-					File root = SPIFFS.open("/P");
-					if (root && root.isDirectory()) {
-						File entry = root.openNextFile();
-						while (entry) {
-							if (!entry.isDirectory()) {
-								size_t esz = entry.size();
-								std::unique_ptr<char[]> ebuf(new char[esz]);
-								entry.readBytes(ebuf.get(), esz);
-								JsonDocument ej;
-								if (!deserializeJson(ej, ebuf.get(), esz)) {
-									String uname = ej["user"].as<String>();
-									if (uname.startsWith("neuerUser")) {
-										int n = uname.substring(9).toInt();
-										if (n > maxN) maxN = n;
-									}
-								}
-							}
-							entry = root.openNextFile();
-						}
-					}
-					json["user"] = "neuerUser" + String(maxN + 1);
-				}
-				File f2 = SPIFFS.open(filename, "w");
-				if (f2) {
-					serializeJson(json, f2);
-					f2.close();
-				}
-			}
-			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":true,\"secret\":\"" + secret + "\"}");
+		if (enrollRunning) {
+			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false,\"error\":\"Enroll already running\"}");
 		} else {
-			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false}");
+			enrollPending = true;
+			Serial.println(F("[ENROLL] Mode armed — waiting for unknown card..."));
+			client->text("[ENROLL] Bereit — bitte unbekannte Karte auflegen...");
 		}
 	}
 	else if (strcmp(command, "formatcard") == 0)
 	{
-		bool success = formatMifareCard();
-		if (success) {
-			client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":true}");
+		if (enrollRunning) {
+			client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":false,\"error\":\"Enroll running\"}");
 		} else {
-			client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":false}");
+			bool success = formatMifareCard();
+			if (success) {
+				client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":true}");
+			} else {
+				client->text("{\"command\":\"result\",\"resultof\":\"formatcard\",\"result\":false}");
+			}
 		}
 	}
 	else if (strcmp(command, "wipecard") == 0)
 	{
-		bool success = wipeMifareCard();
-		client->text(String("{\"command\":\"result\",\"resultof\":\"wipecard\",\"result\":") + (success ? "true" : "false") + "}");
+		if (enrollRunning) {
+			client->text("{\"command\":\"result\",\"resultof\":\"wipecard\",\"result\":false,\"error\":\"Enroll running\"}");
+		} else {
+			bool success = wipeMifareCard();
+			client->text(String("{\"command\":\"result\",\"resultof\":\"wipecard\",\"result\":") + (success ? "true" : "false") + "}");
+		}
 	}
 	else if (strcmp(command, "migratecard") == 0)
 	{
-		String oldKey = root["oldkey"].as<String>();
-		String newKey = root["newkey"].as<String>();
-		bool success = migrateMifareSector(oldKey, newKey);
-		client->text(String("{\"command\":\"result\",\"resultof\":\"migratecard\",\"result\":") + (success ? "true" : "false") + "}");
+		if (enrollRunning) {
+			client->text("{\"command\":\"result\",\"resultof\":\"migratecard\",\"result\":false,\"error\":\"Enroll running\"}");
+		} else {
+			String oldKey = root["oldkey"].as<String>();
+			String newKey = root["newkey"].as<String>();
+			bool success = migrateMifareSector(oldKey, newKey);
+			client->text(String("{\"command\":\"result\",\"resultof\":\"migratecard\",\"result\":") + (success ? "true" : "false") + "}");
+		}
 	}
 	else if (strcmp(command, "testrelay1") == 0)
 	{
