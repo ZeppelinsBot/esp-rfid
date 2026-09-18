@@ -555,7 +555,19 @@ bool wipeMifareCard()
  * Returns true on success.
  */
 bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
-	// mfrc522.uid must be populated (by caller).
+	// Defined re-alignment: HALT the card, then WUPA + fresh select.
+	// Without parallel WebSocket access (enrollRunning blocks the loop)
+	// this is now reliable — subsequent auth needs fresh selection.
+	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
+	delay(100);
+	if (!reselectCard()) {
+		Serial.println(F("[ENROLL] No card on reader"));
+		return false;
+	}
+	delay(100);
+
+	// mfrc522.uid must be populated (by caller or reselectCard above).
 	// Build uid string from it.
 	uid = "";
 	for (byte i = 0; i < mfrc522.uid.size; i++) {
