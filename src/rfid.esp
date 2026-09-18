@@ -382,6 +382,8 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 	for (byte i = 0; i < mfrc522.uid.size; i++) Serial.printf("%02X", mfrc522.uid.uidByte[i]);
 	Serial.println();
 
+	warmUpAuth();
+
 	bool allOk = true;
 	for (int sec = 0; sec < NUM_MIFARE_SECTORS; sec++)
 	{
@@ -390,23 +392,19 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 
 		for (int attempt = 0; attempt < 3 && !locked; attempt++)
 		{
-			// Halt + re-detect before each attempt to ensure clean crypto state
-			if (attempt > 0)
-			{
-				mfrc522.PCD_StopCrypto1();
-				mfrc522.PICC_HaltA();
-				if (!reselectCard())
-				{
-					Serial.printf("[MIGRATE] Sector %d attempt %d: card lost during re-detect\n", sec, attempt + 1);
-					continue;
-				}
-			}
+			mfrc522.PCD_StopCrypto1();
+			delay(50);
 
 			// Try authenticating with old key
 			MFRC522::StatusCode status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailer, &oldKey, &(mfrc522.uid));
 			if (status != MFRC522::STATUS_OK)
 			{
-				Serial.printf("[MIGRATE] Sector %d attempt %d: old key auth failed status=%d\n", sec, attempt + 1, status);
+				Serial.printf("[MIGRATE] Sector %d attempt %d: old key auth failed (status=%d) \u2014 hard resetting\n", sec, attempt + 1, status);
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[MIGRATE] Sector %d: card lost after reader reset\n", sec);
+					continue;
+				}
+				warmUpAuth();
 				continue;
 			}
 
@@ -415,47 +413,62 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 			if (status != MFRC522::STATUS_OK)
 			{
 				Serial.printf("[MIGRATE] Sector %d attempt %d: trailer read failed status=%d\n", sec, attempt + 1, status);
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[MIGRATE] Sector %d: card lost\n", sec);
+				} else {
+					warmUpAuth();
+				}
 				continue;
 			}
 
 			memcpy(trailerData, newKey.keyByte, 6);
 			memcpy(trailerData + 10, newKey.keyByte, 6);
 			status = mfrc522.MIFARE_Write(trailer, trailerData, 16);
+			mfrc522.PCD_StopCrypto1();
 			if (status != MFRC522::STATUS_OK)
 			{
 				Serial.printf("[MIGRATE] Sector %d attempt %d: trailer write failed status=%d\n", sec, attempt + 1, status);
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[MIGRATE] Sector %d: card lost\n", sec);
+				} else {
+					warmUpAuth();
+				}
 				continue;
 			}
 
 			Serial.printf("[MIGRATE] Sector %d: migrated OK\n", sec);
 			locked = true;
 
-			// Halt after each successful migration to reset crypto state for next sector
-			mfrc522.PCD_StopCrypto1();
-			mfrc522.PICC_HaltA();
-			delay(100);
+			// After successful write: hard reset for next sector
+			if (sec < NUM_MIFARE_SECTORS - 1) {
+				mfrc522.PCD_StopCrypto1();
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[MIGRATE] Card lost after sector %d\n", sec);
+					allOk = false;
+					break;
+				}
+				warmUpAuth();
+			}
 		}
 
-		if (!locked)
-		{
+		if (!locked) {
 			Serial.printf("[MIGRATE] Sector %d: FAILED after 3 attempts\n", sec);
 			allOk = false;
-			mfrc522.PCD_StopCrypto1();
-			mfrc522.PICC_HaltA();
-		}
-		else if (sec < NUM_MIFARE_SECTORS - 1)
-		{
-			// Re-detect with WUPA — card was halted after successful migration
-			if (!reselectCard())
-			{
-				Serial.printf("[MIGRATE] Card lost after sector %d, cannot continue\n", sec);
-				allOk = false;
-				break;
+			if (sec < NUM_MIFARE_SECTORS - 1) {
+				mfrc522.PCD_StopCrypto1();
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[MIGRATE] Card lost after sector %d\n", sec);
+					allOk = false;
+					break;
+				}
+				warmUpAuth();
 			}
 		}
 	}
 
-	mfrc522.PCD_StopCrypto1(); mfrc522.PICC_HaltA();
+	mfrc522.PCD_StopCrypto1();
+	mfrc522.PICC_HaltA();
+	delay(200);
 	if (allOk)
 		Serial.println(F("[MIGRATE] SUCCESS: all sectors migrated. Secret unchanged. Update config key before next door access."));
 	else
@@ -511,6 +524,8 @@ bool formatMifareCard() {
 		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF   // Key B (factory default)
 	};
 
+	warmUpAuth();
+
 	bool allOk = true;
 	for (int sec = 0; sec < NUM_MIFARE_SECTORS; sec++)
 	{
@@ -519,24 +534,23 @@ bool formatMifareCard() {
 
 		for (int attempt = 0; attempt < 3 && !formatted; attempt++)
 		{
-			// Halt + re-detect before retry to ensure clean crypto state
-			if (attempt > 0)
-			{
-				mfrc522.PCD_StopCrypto1();
-				mfrc522.PICC_HaltA();
-				if (!reselectCard())
-				{
-					Serial.printf("[FORMAT] Sector %d attempt %d: card lost\n", sec, attempt + 1);
-					continue;
-				}
-			}
+			// Clean crypto state before each attempt
+			mfrc522.PCD_StopCrypto1();
+			delay(50);
 
-			// Try master key, fall back to default key
+			// Try master key first, then default key as fallback
 			MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
 				MFRC522::PICC_CMD_MF_AUTH_KEY_A, trailer, &key, &(mfrc522.uid));
 			if (status != MFRC522::STATUS_OK)
 			{
-				// Retry with default key
+				// Auth failed \u2014 hard reset reader and re-select card
+				Serial.printf("[FORMAT] Sector %d attempt %d: master key failed (status=%d) \u2014 hard resetting\n", sec, attempt + 1, status);
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[FORMAT] Sector %d: card lost after reader reset\n", sec);
+					continue;
+				}
+				warmUpAuth();
+				// Retry with default key after hard reset
 				MFRC522::MIFARE_Key defKey;
 				memcpy(defKey.keyByte, defaultKey.keyByte, 6);
 				status = mfrc522.PCD_Authenticate(
@@ -545,47 +559,64 @@ bool formatMifareCard() {
 			if (status != MFRC522::STATUS_OK)
 			{
 				Serial.printf("[FORMAT] Sector %d attempt %d: auth failed status=%d\n", sec, attempt + 1, status);
+				// Hard reset before next attempt
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[FORMAT] Sector %d: card lost after reader reset\n", sec);
+				} else {
+					warmUpAuth();
+				}
 				continue;
 			}
 
 			status = mfrc522.MIFARE_Write(trailer, factoryTrailer, 16);
+			mfrc522.PCD_StopCrypto1();  // always end crypto after write
 			if (status != MFRC522::STATUS_OK)
 			{
 				Serial.printf("[FORMAT] Sector %d attempt %d: write failed status=%d\n", sec, attempt + 1, status);
+				// Hard reset before next attempt
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[FORMAT] Sector %d: card lost after reader reset\n", sec);
+				} else {
+					warmUpAuth();
+				}
 				continue;
 			}
 
 			Serial.printf("[FORMAT] Sector %d: formatted OK\n", sec);
 			formatted = true;
 
-			// Halt after each successful format to reset crypto state
-			mfrc522.PCD_StopCrypto1();
-			mfrc522.PICC_HaltA();
-			delay(100);
+			// After successful write: hard reset for next sector (no HaltA/WUPA!)
+			if (sec < NUM_MIFARE_SECTORS - 1) {
+				mfrc522.PCD_StopCrypto1();
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[FORMAT] Card lost after sector %d\n", sec);
+					allOk = false;
+					break;
+				}
+				warmUpAuth();
+			}
 		}
 
-		if (!formatted)
-		{
+		if (!formatted) {
 			Serial.printf("[FORMAT] Sector %d: FAILED after 3 attempts\n", sec);
 			allOk = false;
-			mfrc522.PCD_StopCrypto1();
-			mfrc522.PICC_HaltA();
-		}
-		else if (sec < NUM_MIFARE_SECTORS - 1)
-		{
-			if (!reselectCard())
-			{
-				Serial.printf("[FORMAT] Card lost after sector %d\n", sec);
-				allOk = false;
-				break;
+			// Try to recover for next sector
+			if (sec < NUM_MIFARE_SECTORS - 1) {
+				mfrc522.PCD_StopCrypto1();
+				if (!hardResetAndReselectCard()) {
+					Serial.printf("[FORMAT] Card lost after sector %d\n", sec);
+					allOk = false;
+					break;
+				}
+				warmUpAuth();
 			}
 		}
 	}
 
-	// Verify: try to authenticate with factory default key on Sector 1
+	// Verify: hard reset + warm-up auth + try default key
 	mfrc522.PCD_StopCrypto1();
-	mfrc522.PICC_HaltA();
-	if (reselectCard()) {
+	if (hardResetAndReselectCard()) {
+		warmUpAuth();
 		MFRC522::MIFARE_Key defaultVerifyKey;
 		memcpy(defaultVerifyKey.keyByte, defaultKey.keyByte, 6);
 		MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
@@ -599,6 +630,7 @@ bool formatMifareCard() {
 
 	mfrc522.PCD_StopCrypto1();
 	mfrc522.PICC_HaltA();
+	delay(200);
 
 	if (allOk)
 		Serial.println(F("[FORMAT] SUCCESS: all 16 sectors restored to factory defaults."));
