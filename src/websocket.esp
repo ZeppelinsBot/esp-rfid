@@ -207,6 +207,32 @@ void processWsMessage(WsMessage *incomingMessage)
 				JsonDocument json;
 				deserializeJson(json, buf.get(), size);
 				json["secret"] = secret;
+				// Auto-name as neuerUserN if no name set
+				String currentName = json["user"].as<String>();
+				if (currentName.length() == 0 || currentName == "null" || currentName == "undefined") {
+					int maxN = 0;
+					File root = SPIFFS.open("/P");
+					if (root && root.isDirectory()) {
+						File entry = root.openNextFile();
+						while (entry) {
+							if (!entry.isDirectory()) {
+								size_t esz = entry.size();
+								std::unique_ptr<char[]> ebuf(new char[esz]);
+								entry.readBytes(ebuf.get(), esz);
+								JsonDocument ej;
+								if (!deserializeJson(ej, ebuf.get(), esz)) {
+									String uname = ej["user"].as<String>();
+									if (uname.startsWith("neuerUser")) {
+										int n = uname.substring(9).toInt();
+										if (n > maxN) maxN = n;
+									}
+								}
+							}
+							entry = root.openNextFile();
+						}
+					}
+					json["user"] = "neuerUser" + String(maxN + 1);
+				}
 				File f2 = SPIFFS.open(filename, "w");
 				if (f2) {
 					serializeJson(json, f2);

@@ -161,31 +161,25 @@ bool reselectCard() {
 
 /*
  * Lock ALL 16 MIFARE Classic 1K sector trailers with the custom master key.
- * For each sector trailer: reads current data, replaces Key A and Key B with
- * the master key, keeps access bits (bytes 6-9) unchanged, writes back.
- * Tries master key first (in case already locked), falls back to default key.
+ * NO halt/re-detect between sectors — keeps the crypto session alive
+ * throughout. The caller must have an active crypto session (e.g. after
+ * secret write + verify in enrollMifareClassic).
+ * For each sector trailer: authenticates with master key (fallback default key),
+ * reads current data, replaces Key A and Key B with master key, keeps access
+ * bits (bytes 6-9), writes back. Max 3 attempts per sector.
+ * At the end: PCD_StopCrypto1 + PICC_HaltA + delay.
  * Returns true if all sectors were successfully locked.
  */
 bool lockAllSectors()
 {
 	Serial.println(F("[LOCK] Locking all 16 sector trailers with master key..."));
 
-	// Stop crypto BEFORE halt — otherwise the HLTA command is encrypted
-	// and the card won't understand it (MIFARE Classic ignores encrypted HLTA)
-	mfrc522.PCD_StopCrypto1();
-	mfrc522.PICC_HaltA();
-
-	// Re-detect with WUPA — halted cards ignore REQA
-	if (!reselectCard())
-	{
-		Serial.println(F("[LOCK] Failed: card lost before locking"));
-		return false;
-	}
-
 	MFRC522::MIFARE_Key masterKey;
 	if (!loadSectorMasterKey(masterKey))
 	{
 		Serial.println(F("[LOCK] Aborted: invalid sector master key in config"));
+		mfrc522.PCD_StopCrypto1();
+		mfrc522.PICC_HaltA();
 		return false;
 	}
 
@@ -197,18 +191,6 @@ bool lockAllSectors()
 
 		for (int attempt = 0; attempt < 3 && !locked; attempt++)
 		{
-			// Halt + re-detect before each attempt to ensure clean crypto state
-			if (attempt > 0)
-			{
-				mfrc522.PCD_StopCrypto1();
-				mfrc522.PICC_HaltA();
-				if (!reselectCard())
-				{
-					Serial.printf("[LOCK] Sector %d attempt %d: card lost during re-detect\n", sec, attempt + 1);
-					continue;
-				}
-			}
-
 			// Try master key first (in case already locked), fall back to default key
 			bool authed = false;
 			MFRC522::StatusCode status = mfrc522.PCD_Authenticate(
@@ -230,9 +212,9 @@ bool lockAllSectors()
 				if (status == MFRC522::STATUS_OK)
 				{
 					authed = true;
-				#ifdef DEBUG
+			#ifdef DEBUG
 					Serial.printf("[LOCK] Sector %d: authenticated with default key\n", sec);
-				#endif
+			#endif
 				}
 			}
 
@@ -262,37 +244,22 @@ bool lockAllSectors()
 				continue;
 			}
 
-			Serial.printf("[LOCK] Sector %d: locked OK (trailer block %d)\n", sec, trailer);
+			Serial.printf("[LOCK] Sector %d: OK\n", sec);
 			locked = true;
-
-			// Halt after each successful lock to reset crypto state for next sector
-			mfrc522.PCD_StopCrypto1();
-			mfrc522.PICC_HaltA();
-			delay(100);
 		}
 
 		if (!locked)
 		{
 			Serial.printf("[LOCK] Sector %d: FAILED after 3 attempts\n", sec);
 			allOk = false;
-			// Halt to clean up state before trying next sector
-			mfrc522.PCD_StopCrypto1();
-			mfrc522.PICC_HaltA();
-		}
-		else if (sec < NUM_MIFARE_SECTORS - 1)
-		{
-			// Re-detect with WUPA — card was halted after successful lock
-			if (!reselectCard())
-			{
-				Serial.printf("[LOCK] Card lost after sector %d, cannot continue\n", sec);
-				allOk = false;
-				break;
-			}
 		}
 	}
 
+	// Release crypto session and halt card AFTER all sectors are done
 	mfrc522.PCD_StopCrypto1();
 	mfrc522.PICC_HaltA();
+	delay(100);
+
 	if (allOk)
 		Serial.println(F("[LOCK] SUCCESS: all 16 sectors locked with master key"));
 	else
@@ -579,17 +546,10 @@ bool wipeMifareCard()
  * Returns true on success.
  */
 bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
-	// Wait for card to be presented (user must remove + re-present after scan)
-	Serial.println(F("[ENROLL] Waiting for card..."));
-	unsigned long start = millis();
-	while (millis() - start < 10000) {
-		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-			break;
-		}
-		delay(50);
-	}
-	if (!mfrc522.uid.size) {
-		Serial.println(F("[ENROLL] Timeout — no card found"));
+	// Card is already on reader — re-select it (WUPA) instead of waiting for removal
+	Serial.println(F("[ENROLL] Re-selecting card on reader..."));
+	if (!reselectCard()) {
+		Serial.println(F("[ENROLL] No card on reader"));
 		return false;
 	}
 
@@ -700,9 +660,7 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	if (!allLocked) {
 		Serial.println(F("[ENROLL] Warning: some sectors could not be locked"));
 	}
-
-	mfrc522.PCD_StopCrypto1();
-	mfrc522.PICC_HaltA();
+	// lockAllSectors() does StopCrypto1 + HaltA + delay internally
 
 	Serial.printf("[ENROLL] Success! Secret: %s SectorKey: %s\n", outSecret.c_str(), outSectorKey.c_str());
 	return true;
