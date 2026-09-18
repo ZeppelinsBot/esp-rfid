@@ -655,9 +655,9 @@ void mfrc522Read()
 				}
 			}
 			json["user"] = "neuerUser" + String(maxN + 1);
-			json["acctype"] = 0;
+			json["acctype"] = ACCESS_GRANTED;  // Always — sofort testbar
 			json["validsince"] = 0;
-			json["validuntil"] = 0;
+			json["validuntil"] = 4102444799UL; // 31.12.2099 23:59:59 UTC
 			File f2 = SPIFFS.open(filename, "w");
 			if (f2) {
 				serializeJson(json, f2);
