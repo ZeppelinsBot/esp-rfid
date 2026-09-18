@@ -105,6 +105,9 @@ void processWsMessage(WsMessage *incomingMessage)
 	{
 		int page = root["page"];
 		sendUserList(page, incomingMessage->client);
+		// Arm auto-enroll when user opens USERS tab
+		enrollPending = true;
+		Serial.println(F("[ENROLL] Armed via userlist (USERS tab opened)"));
 	}
 	else if (strcmp(command, "status") == 0)
 	{
@@ -192,11 +195,12 @@ void processWsMessage(WsMessage *incomingMessage)
 	}
 	else if (strcmp(command, "enroll") == 0)
 	{
+		// Legacy button: just arm the flag (same as userlist)
 		if (enrollRunning) {
 			client->text("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false,\"error\":\"Enroll already running\"}");
 		} else {
 			enrollPending = true;
-			Serial.println(F("[ENROLL] Mode armed — waiting for unknown card..."));
+			Serial.println(F("[ENROLL] Mode armed (via enroll command) — waiting for unknown card..."));
 			client->text("[ENROLL] Bereit — bitte unbekannte Karte auflegen...");
 		}
 	}

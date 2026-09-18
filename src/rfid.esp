@@ -555,8 +555,8 @@ bool wipeMifareCard()
  * Returns true on success.
  */
 bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
-	// Card is already on reader and selected by the main loop (ACTIVE state).
-	// mfrc522.uid is populated. Build uid string from it.
+	// mfrc522.uid must be populated (by caller).
+	// Build uid string from it.
 	uid = "";
 	for (byte i = 0; i < mfrc522.uid.size; i++) {
 		if (mfrc522.uid.uidByte[i] < 0x10) uid += "0";
@@ -564,12 +564,6 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	}
 	uid.toLowerCase();
 	Serial.printf("[ENROLL] Card UID: %s\n", uid.c_str());
-
-	// Wake the card from HALT state (mfrc522Read already halted it)
-	if (!reselectCard()) {
-		Serial.println(F("[ENROLL] Failed to wake card"));
-		return false;
-	}
 
 	// Authenticate to Sector 1 with default Key A (with retries)
 	MFRC522::MIFARE_Key key;
@@ -586,7 +580,10 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 		if (attempt < 2) {
 			mfrc522.PCD_StopCrypto1();
 			mfrc522.PICC_HaltA();
-			reselectCard();
+			if (!reselectCard()) {
+				Serial.println(F("[ENROLL] Card lost during re-select"));
+				return false;
+			}
 		}
 	}
 	if (status != MFRC522::STATUS_OK) {
@@ -700,6 +697,7 @@ bool verifyMifareClassic(const String &storedSecret) {
 
 void mfrc522Read()
 {
+	if (enrollRunning) return; // Guard: skip scan while enroll is active
 	if (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())
 	{
 		return;
@@ -755,8 +753,6 @@ void mfrc522Read()
 		}
 	}
 	mfrc522.PCD_StopCrypto1();
-	mfrc522.PICC_HaltA();
-	cooldown = millis() + COOLDOWN_MILIS;
 
 	/*
 	 *  Convert RC522 UID into string
@@ -772,19 +768,79 @@ void mfrc522Read()
 		uid+=(String(mfrc522.uid.uidByte[i], HEX));
 		v1uid+=(String(mfrc522.uid.uidByte[i], HEX));
 	}
-	rfidState = cardSwiped;
-
-#ifdef DEBUG
-	Serial.print(F("[ INFO ] PICC's UID: "));
-	Serial.print(uid);
-#endif
 
 	MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
 	type = mfrc522.PICC_GetTypeName(piccType);
 
 #ifdef DEBUG
+	Serial.print(F("[ INFO ] PICC's UID: "));
+	Serial.print(uid);
 	Serial.print(" " + type);
 #endif
+
+	// Check if user file exists — if NOT and auto-enroll is armed,
+	// do the enroll NOW while the card is still SELECTED (not halted).
+	// This avoids the reselectCard() problem that caused "No card on reader".
+	String probeFile = "/P/" + uid;
+	bool userExists = SPIFFS.exists(probeFile) || SPIFFS.exists("/P/" + v1uid);
+
+	if (!userExists && enrollPending && !enrollRunning && config.readertype == READER_MFRC522) {
+		enrollRunning = true;
+		Serial.println(F("[ENROLL] Auto-enroll from fresh card detection (no halt/reselect needed)"));
+		String sec, sKey;
+		bool ok = enrollMifareClassic(sec, sKey);
+		if (ok) {
+			// Save user file with secret + auto-name
+			String filename = "/P/" + String(uid);
+			JsonDocument json;
+			json["secret"] = sec;
+			// Auto-name as neuerUserN
+			int maxN = 0;
+			File rootDir = SPIFFS.open("/P");
+			if (rootDir && rootDir.isDirectory()) {
+				File entry = rootDir.openNextFile();
+				while (entry) {
+					if (!entry.isDirectory()) {
+						size_t esz = entry.size();
+						std::unique_ptr<char[]> ebuf(new char[esz]);
+						entry.readBytes(ebuf.get(), esz);
+						JsonDocument ej;
+						if (!deserializeJson(ej, ebuf.get(), esz)) {
+							String uname = ej["user"].as<String>();
+							if (uname.startsWith("neuerUser")) {
+								int n = uname.substring(9).toInt();
+								if (n > maxN) maxN = n;
+							}
+						}
+					}
+					entry = rootDir.openNextFile();
+				}
+			}
+			json["user"] = "neuerUser" + String(maxN + 1);
+			json["acctype"] = 0;
+			json["validsince"] = 0;
+			json["validuntil"] = 0;
+			File f2 = SPIFFS.open(filename, "w");
+			if (f2) {
+				serializeJson(json, f2);
+				f2.close();
+			}
+			Serial.printf("[ENROLL] Saved user neuerUser%d for UID %s\n", maxN + 1, uid.c_str());
+			ws.textAll("[ENROLL] SUCCESS — Karte entfernen");
+		} else {
+			Serial.println(F("[ENROLL] Auto-enroll failed"));
+			ws.textAll("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false}");
+		}
+		enrollRunning = false;
+		// lockAllSectors() already did PCD_StopCrypto1 + PICC_HaltA + delay
+		cooldown = millis() + COOLDOWN_MILIS;
+		return; // Card is halted, enrollment handled; skip normal flow
+	}
+
+	// Normal path: halt card, set state for rfidProcess()
+	mfrc522.PICC_HaltA();
+	cooldown = millis() + COOLDOWN_MILIS;
+	rfidState = cardSwiped;
 }
 
 void pn532Read()
@@ -1004,59 +1060,10 @@ void rfidProcess()
 		bool existsV1 = SPIFFS.exists("/P/" + v1uid);
 		if (!existsV1)
 		{
-			// Auto-enroll: if enroll mode is armed, enroll this unknown card now
-			if (enrollPending && !enrollRunning && config.readertype == READER_MFRC522) {
-				enrollRunning = true;
-				enrollPending = false;
-				Serial.println(F("[ENROLL] Auto-enroll triggered for unknown card"));
-				String sec, sKey;
-				bool ok = enrollMifareClassic(sec, sKey);
-				if (ok) {
-					// Save user file with secret + auto-name
-					String filename = "/P/" + String(uid);
-					JsonDocument json;
-					json["secret"] = sec;
-					// Auto-name as neuerUserN
-					int maxN = 0;
-					File rootDir = SPIFFS.open("/P");
-					if (rootDir && rootDir.isDirectory()) {
-						File entry = rootDir.openNextFile();
-						while (entry) {
-							if (!entry.isDirectory()) {
-								size_t esz = entry.size();
-								std::unique_ptr<char[]> ebuf(new char[esz]);
-								entry.readBytes(ebuf.get(), esz);
-								JsonDocument ej;
-								if (!deserializeJson(ej, ebuf.get(), esz)) {
-									String uname = ej["user"].as<String>();
-									if (uname.startsWith("neuerUser")) {
-										int n = uname.substring(9).toInt();
-										if (n > maxN) maxN = n;
-									}
-								}
-							}
-							entry = rootDir.openNextFile();
-						}
-					}
-					json["user"] = "neuerUser" + String(maxN + 1);
-					json["acctype"] = 0;
-					json["validsince"] = 0;
-					json["validuntil"] = 0;
-					File f2 = SPIFFS.open(filename, "w");
-					if (f2) {
-						serializeJson(json, f2);
-						f2.close();
-					}
-					Serial.printf("[ENROLL] Saved user neuerUser%d for UID %s\n", maxN + 1, uid.c_str());
-					// Send success response via WS
-					String resp = "{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":true,\"secret\":\"" + sec + "\",\"user\":\"neuerUser" + String(maxN + 1) + "\"}";
-					ws.textAll(resp);
-				} else {
-					Serial.println(F("[ENROLL] Auto-enroll failed"));
-					ws.textAll("{\"command\":\"result\",\"resultof\":\"enroll\",\"result\":false}");
-				}
-				enrollRunning = false;
-				// Fall through to unknown handling (piccscan notification)
+			if (enrollRunning) {
+				// Auto-enroll already ran from mfrc522Read() — card was just
+				// enrolled and is halted. Don't re-process or send duplicate notification.
+				return;
 			}
 			processingState = unknown;
 			Serial.println(F("[RFID] Unknown user"));
