@@ -129,6 +129,26 @@ bool hardResetAndReselectCard() {
 	return false;
 }
 
+// Gemeinsamer Karten-Einstieg fuer Enroll/Format/Migrate: Erst kurz per REQA
+// versuchen (Karte liegt frisch/IDLE), dann — wenn die Karte vom Loop-Scan
+// selektiert (ACTIVE) ist und REQA ignoriert — einen Hard-Reset machen.
+// Der Reset bricht das RF-Feld kurz zusammen, die Karte faellt in IDLE und
+// laesst sich danach sauber selektieren (loest das "liegengebliebene Karte"-
+// Problem: Enroll/Format/Migrate starteten sonst erst beim 2./3. Auflegen).
+// Gibt true zurueck, wenn eine Karte frisch selektiert wurde (uid befuellt).
+bool selectCardPatient() {
+	unsigned long start = millis();
+	while (millis() - start < 1000) {
+		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
+			delay(100);
+			return true;
+		}
+		delay(50);
+	}
+	Serial.println(F("[RFID] REQA timeout — hard resetting reader..."));
+	return hardResetAndReselectCard();
+}
+
 // Sector 1, Block 4 — where we store the secret key
 #define SECRET_SECTOR 1
 #define SECRET_BLOCK  4
@@ -370,12 +390,10 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
 		Serial.println(F("[MIGRATE] Aborted: keys must contain exactly 12 hexadecimal characters"));
 		return false;
 	}
-	Serial.println(F("[MIGRATE] Present card and hold for 5 seconds..."));
-	unsigned long start = millis();
-	while (millis() - start < 15000 && (!mfrc522.PICC_IsNewCardPresent() || !mfrc522.PICC_ReadCardSerial())) delay(50);
-	if (!mfrc522.uid.size)
+	Serial.println(F("[MIGRATE] Present card..."));
+	if (!selectCardPatient())
 	{
-		Serial.println(F("[MIGRATE] Failed: no card detected within 15 seconds"));
+		Serial.println(F("[MIGRATE] Failed: no card detected"));
 		return false;
 	}
 	Serial.print(F("[MIGRATE] Card detected UID="));
@@ -483,14 +501,8 @@ bool migrateMifareSector(const String &oldKeyString, const String &newKeyString)
  */
 bool formatMifareCard() {
 	Serial.println(F("[FORMAT] Waiting for card..."));
-	unsigned long start = millis();
-	while (millis() - start < 10000) {
-		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-			break;
-		}
-		delay(50);
-	}
-	if (!mfrc522.uid.size) {
+	if (!selectCardPatient())
+	{
 		Serial.println(F("[FORMAT] Timeout — no card found"));
 		return false;
 	}
@@ -672,16 +684,7 @@ bool enrollMifareClassic(String &outSecret, String &outSectorKey) {
 	// REQA wiederholt senden, bis sich die Karte (nach kurzer Ruhe in IDLE)
 	// frisch fangen laesst. Exakt die Sequenz, die heute (11:05) als einzige
 	// den Block-4-Auth durchbrachte. KEIN HaltA/WUPA (bricht den RC522-Clone).
-	unsigned long reSelectStart = millis();
-	bool reSelected = false;
-	while (millis() - reSelectStart < 4000) {
-		if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-			reSelected = true;
-			break;
-		}
-		delay(150);
-	}
-	if (!reSelected) {
+	if (!selectCardPatient()) {
 		Serial.println(F("[ENROLL] No card on reader"));
 		return false;
 	}
