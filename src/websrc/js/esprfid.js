@@ -320,22 +320,9 @@ function saventp() {
   uncommited();
 }
 
-function migrateSectorCard() {
-  var oldKey = document.getElementById("oldsectormasterkey").value.trim().toUpperCase();
-  var newKey = document.getElementById("newsectormasterkey").value.trim().toUpperCase();
-  if (!/^[0-9A-F]{12}$/.test(oldKey) || !/^[0-9A-F]{12}$/.test(newKey) || oldKey === newKey) {
-    alert("Enter two different keys with exactly 12 hexadecimal characters.");
-    return;
-  }
-  alert("Place the card on the reader and hold it for at least 5 seconds. Do not remove it until the result is shown.");
-  sendWebsocketWithRetry(JSON.stringify({command: "migratecard", oldkey: oldKey, newkey: newKey}));
-}
 
-function wipeSectorCard() {
-  if (!confirm("This will format the card to factory defaults AND delete its user entry. The card will stop working for door access. Continue?")) return;
-  alert("Place the card on the reader and hold it for at least 5 seconds.");
-  sendWebsocketWithRetry(JSON.stringify({command: "wipecard"}));
-}
+
+
 
 function useMigratedSectorKey() {
   var newKey = document.getElementById("newsectormasterkey").value.trim().toUpperCase();
@@ -1621,20 +1608,8 @@ function socketMessageListener(evt) {
   if (obj.hasOwnProperty("resultof")) {
     websocketMessagesToRetry.shift();
     switch (obj.resultof) {
-      case "migratecard":
-        if (obj.result === true) {
-          alert("Card migration succeeded. The secret was preserved.\n\nIMPORTANT: You must click 'Use new key as standard' before the card will work for door access.");
-        } else {
-          alert("Card migration failed. Old key may be wrong or card was not presented. Check serial output.");
-        }
-        break;
-      case "wipecard":
-        if (obj.result === true) {
-          alert("Card wiped successfully. Sector trailer reset to factory defaults and user entry removed.");
-        } else {
-          alert("Card wipe failed. Check serial output.");
-        }
-        break;
+
+
       case "latestlog":
         if (obj.result === false) {
           logdata = [];
